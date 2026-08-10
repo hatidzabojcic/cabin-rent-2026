@@ -1,0 +1,60 @@
+services:
+  cabinrent-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - cabinrent-sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [cabinrent-network]
+
+  cabinrent-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks: [cabinrent-network]
+
+  cabinrent-api:
+    build:
+      context: .
+      dockerfile: backend/CabinRent.API/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=CabinRent;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__AccessTokenMinutes: ${JWT_ACCESS_TOKEN_MINUTES}
+      Jwt__RefreshTokenDays: ${JWT_REFRESH_TOKEN_DAYS}
+      Seed__AdminUserName: ${SEED_ADMIN_USERNAME}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD}
+      Seed__OwnerUserName: ${SEED_OWNER_USERNAME}
+      Seed__OwnerPassword: ${SEED_OWNER_PASSWORD}
+      Seed__GuestUserName: ${SEED_GUEST_USERNAME}
+      Seed__GuestPassword: ${SEED_GUEST_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      cabinrent-sql:
+        condition: service_healthy
+    networks: [cabinrent-network]
+
+volumes:
+  cabinrent-sql-data:
+
+networks:
+  cabinrent-network:
+    driver: bridge

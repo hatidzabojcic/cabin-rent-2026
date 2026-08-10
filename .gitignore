@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+.idea/
+.env
+.dotnet-home/
+*.user
+*.suo
+*.db
+TestResults/
+coverage/
+debug.log
+.dart_tool/
+build/
+.flutter-plugins*
+GeneratedPluginRegistrant.*

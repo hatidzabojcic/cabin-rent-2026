@@ -1,0 +1,14 @@
+.git
+.github
+.dotnet-home
+.vs
+.vscode
+**/bin
+**/obj
+**/TestResults
+**/coverage
+.env
+debug.log
+frontend
+docs
+scripts
