@@ -52,4 +52,108 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
                 dbContext.Reviews.Where(r => r.CabinId == x.Id && r.IsApproved).Select(r => (double?)r.Rating).Average(),
                 x.Images.Where(i => i.IsCover).Select(i => i.Url).FirstOrDefault()))
             .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyCollection<CabinDetailsDto>> GetManagedAsync(int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Cabins.AsNoTracking().AsQueryable();
+        if (!isAdmin) query = query.Where(x => x.OwnerId == actorId);
+        return await query.OrderBy(x => x.Name).Select(DetailsProjection()).ToListAsync(cancellationToken);
+    }
+
+    public Task<CabinDetailsDto?> GetManagedByIdAsync(int id, int actorId, bool isAdmin, CancellationToken cancellationToken = default) =>
+        ManagedQuery(id, actorId, isAdmin).AsNoTracking().Select(DetailsProjection()).SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<CabinDetailsDto> CreateAsync(SaveCabinRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var ownerId = isAdmin && request.OwnerId.HasValue ? request.OwnerId.Value : actorId;
+        await ValidateReferencesAsync(request, ownerId, cancellationToken);
+
+        var cabin = new Cabin
+        {
+            Name = request.Name.Trim(), Description = request.Description.Trim(), Address = request.Address.Trim(),
+            AreaSquareMeters = request.AreaSquareMeters, PricePerNight = request.PricePerNight,
+            MaxAdults = request.MaxAdults, MaxChildren = request.MaxChildren, Bedrooms = request.Bedrooms,
+            Bathrooms = request.Bathrooms, Latitude = request.Latitude, Longitude = request.Longitude,
+            OwnerId = ownerId, CityId = request.CityId, CabinTypeId = request.CabinTypeId
+        };
+        ApplyRelations(cabin, request);
+        dbContext.Cabins.Add(cabin);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return (await GetManagedByIdAsync(cabin.Id, actorId, isAdmin, cancellationToken))!;
+    }
+
+    public async Task<CabinDetailsDto?> UpdateAsync(int id, SaveCabinRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var cabin = await ManagedQuery(id, actorId, isAdmin)
+            .Include(x => x.Images).Include(x => x.CabinAmenities)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (cabin is null) return null;
+
+        var ownerId = isAdmin && request.OwnerId.HasValue ? request.OwnerId.Value : cabin.OwnerId;
+        await ValidateReferencesAsync(request, ownerId, cancellationToken);
+        cabin.Name = request.Name.Trim(); cabin.Description = request.Description.Trim(); cabin.Address = request.Address.Trim();
+        cabin.AreaSquareMeters = request.AreaSquareMeters; cabin.PricePerNight = request.PricePerNight;
+        cabin.MaxAdults = request.MaxAdults; cabin.MaxChildren = request.MaxChildren; cabin.Bedrooms = request.Bedrooms;
+        cabin.Bathrooms = request.Bathrooms; cabin.Latitude = request.Latitude; cabin.Longitude = request.Longitude;
+        cabin.OwnerId = ownerId; cabin.CityId = request.CityId; cabin.CabinTypeId = request.CabinTypeId;
+        cabin.UpdatedAtUtc = DateTime.UtcNow;
+        ApplyRelations(cabin, request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await GetManagedByIdAsync(id, actorId, isAdmin, cancellationToken);
+    }
+
+    public async Task<CabinDetailsDto?> SetActiveAsync(int id, bool isActive, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var cabin = await ManagedQuery(id, actorId, isAdmin).SingleOrDefaultAsync(cancellationToken);
+        if (cabin is null) return null;
+        cabin.IsActive = isActive;
+        cabin.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await GetManagedByIdAsync(id, actorId, isAdmin, cancellationToken);
+    }
+
+    private IQueryable<Cabin> ManagedQuery(int id, int actorId, bool isAdmin) =>
+        dbContext.Cabins.Where(x => x.Id == id && (isAdmin || x.OwnerId == actorId));
+
+    private async Task ValidateReferencesAsync(SaveCabinRequest request, int ownerId, CancellationToken cancellationToken)
+    {
+        if (!await dbContext.Users.AnyAsync(x => x.Id == ownerId && x.IsActive && x.UserRoles.Any(r => r.Role.Name == "Owner"), cancellationToken))
+            throw new ArgumentException("Odabrani vlasnik nije validan Owner korisnik.");
+        if (!await dbContext.Cities.AnyAsync(x => x.Id == request.CityId, cancellationToken))
+            throw new ArgumentException("Odabrani grad ne postoji.");
+        if (!await dbContext.CabinTypes.AnyAsync(x => x.Id == request.CabinTypeId, cancellationToken))
+            throw new ArgumentException("Odabrani tip vikendice ne postoji.");
+        var amenityIds = request.AmenityIds.Distinct().ToArray();
+        if (amenityIds.Length != await dbContext.Amenities.CountAsync(x => amenityIds.Contains(x.Id), cancellationToken))
+            throw new ArgumentException("Jedna ili više odabranih pogodnosti ne postoje.");
+    }
+
+    private static void ApplyRelations(Cabin cabin, SaveCabinRequest request)
+    {
+        cabin.CabinAmenities.Clear();
+        foreach (var amenityId in request.AmenityIds.Distinct())
+            cabin.CabinAmenities.Add(new CabinAmenity { AmenityId = amenityId, Cabin = cabin });
+
+        var currentCover = cabin.Images.FirstOrDefault(x => x.IsCover);
+        if (string.IsNullOrWhiteSpace(request.CoverImageUrl))
+        {
+            if (currentCover is not null) cabin.Images.Remove(currentCover);
+        }
+        else if (currentCover is null)
+        {
+            cabin.Images.Add(new CabinImage { Url = request.CoverImageUrl.Trim(), AltText = cabin.Name, IsCover = true, SortOrder = 0 });
+        }
+        else
+        {
+            currentCover.Url = request.CoverImageUrl.Trim(); currentCover.AltText = cabin.Name; currentCover.UpdatedAtUtc = DateTime.UtcNow;
+        }
+    }
+
+    private static System.Linq.Expressions.Expression<Func<Cabin, CabinDetailsDto>> DetailsProjection() => x =>
+        new CabinDetailsDto(x.Id, x.Name, x.Description, x.Address, x.AreaSquareMeters, x.PricePerNight,
+            x.MaxAdults, x.MaxChildren, x.Bedrooms, x.Bathrooms, x.Latitude, x.Longitude, x.IsActive,
+            x.OwnerId, x.Owner.FirstName + " " + x.Owner.LastName, x.CityId, x.City.Name,
+            x.CabinTypeId, x.CabinType.Name,
+            x.Images.OrderBy(i => i.SortOrder).Select(i => new CabinImageDto(i.Id, i.Url, i.AltText, i.SortOrder, i.IsCover)).ToList(),
+            x.CabinAmenities.OrderBy(a => a.Amenity.Name).Select(a => new CabinAmenityDto(a.AmenityId, a.Amenity.Name, a.Amenity.Icon)).ToList());
 }

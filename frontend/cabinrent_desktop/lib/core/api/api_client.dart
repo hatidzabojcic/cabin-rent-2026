@@ -35,6 +35,43 @@ class ApiClient {
     return _decodeObject(response);
   }
 
+  Future<List<dynamic>> getList(
+    String path, {
+    bool authenticated = false,
+  }) async {
+    final response = await _client.get(
+      _uri(path),
+      headers: _headers(authenticated),
+    );
+    return _decodeList(response);
+  }
+
+  Future<Map<String, dynamic>> put(
+    String path, {
+    required Object body,
+    bool authenticated = false,
+  }) async {
+    final response = await _client.put(
+      _uri(path),
+      headers: _headers(authenticated),
+      body: jsonEncode(body),
+    );
+    return _decodeObject(response);
+  }
+
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    required Object body,
+    bool authenticated = false,
+  }) async {
+    final response = await _client.patch(
+      _uri(path),
+      headers: _headers(authenticated),
+      body: jsonEncode(body),
+    );
+    return _decodeObject(response);
+  }
+
   Uri _uri(String path) => Uri.parse('${AppConfig.apiBaseUrl}$path');
 
   Map<String, String> _headers(bool authenticated) => {
@@ -45,9 +82,7 @@ class ApiClient {
   };
 
   Map<String, dynamic> _decodeObject(http.Response response) {
-    final Object? decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(utf8.decode(response.bodyBytes));
+    final decoded = _decode(response);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded as Map<String, dynamic>;
@@ -59,4 +94,20 @@ class ApiClient {
     }
     throw ApiException(message, statusCode: response.statusCode);
   }
+
+  List<dynamic> _decodeList(http.Response response) {
+    final decoded = _decode(response);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded as List<dynamic>;
+    }
+    var message = 'Došlo je do greške pri komunikaciji sa serverom.';
+    if (decoded is Map<String, dynamic>) {
+      message = (decoded['title'] ?? decoded['detail'] ?? message).toString();
+    }
+    throw ApiException(message, statusCode: response.statusCode);
+  }
+
+  Object? _decode(http.Response response) => response.body.isEmpty
+      ? <String, dynamic>{}
+      : jsonDecode(utf8.decode(response.bodyBytes));
 }

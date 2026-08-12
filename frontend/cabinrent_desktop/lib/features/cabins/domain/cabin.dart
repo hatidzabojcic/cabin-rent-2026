@@ -2,28 +2,152 @@ class Cabin {
   const Cabin({
     required this.id,
     required this.name,
-    required this.city,
+    required this.description,
+    required this.address,
+    required this.areaSquareMeters,
     required this.pricePerNight,
-    required this.maxGuests,
-    this.averageRating,
+    required this.maxAdults,
+    required this.maxChildren,
+    required this.bedrooms,
+    required this.bathrooms,
+    required this.isActive,
+    required this.ownerId,
+    required this.ownerName,
+    required this.cityId,
+    required this.city,
+    required this.cabinTypeId,
+    required this.cabinType,
+    required this.amenityIds,
+    this.latitude,
+    this.longitude,
     this.coverImageUrl,
   });
 
   factory Cabin.fromJson(Map<String, dynamic> json) => Cabin(
     id: json['id'] as int,
     name: json['name'] as String,
-    city: json['city'] as String,
+    description: json['description'] as String,
+    address: json['address'] as String,
+    areaSquareMeters: (json['areaSquareMeters'] as num).toDouble(),
     pricePerNight: (json['pricePerNight'] as num).toDouble(),
-    maxGuests: json['maxGuests'] as int,
-    averageRating: (json['averageRating'] as num?)?.toDouble(),
-    coverImageUrl: json['coverImageUrl'] as String?,
+    maxAdults: json['maxAdults'] as int,
+    maxChildren: json['maxChildren'] as int,
+    bedrooms: json['bedrooms'] as int,
+    bathrooms: json['bathrooms'] as int,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
+    isActive: json['isActive'] as bool,
+    ownerId: json['ownerId'] as int,
+    ownerName: json['ownerName'] as String,
+    cityId: json['cityId'] as int,
+    city: json['city'] as String,
+    cabinTypeId: json['cabinTypeId'] as int,
+    cabinType: json['cabinType'] as String,
+    coverImageUrl: (json['images'] as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .where((image) => image['isCover'] as bool)
+        .map((image) => image['url'] as String)
+        .firstOrNull,
+    amenityIds: (json['amenities'] as List<dynamic>)
+        .map((item) => (item as Map<String, dynamic>)['id'] as int)
+        .toSet(),
   );
 
   final int id;
   final String name;
-  final String city;
+  final String description;
+  final String address;
+  final double areaSquareMeters;
   final double pricePerNight;
-  final int maxGuests;
-  final double? averageRating;
+  final int maxAdults;
+  final int maxChildren;
+  final int bedrooms;
+  final int bathrooms;
+  final double? latitude;
+  final double? longitude;
+  final bool isActive;
+  final int ownerId;
+  final String ownerName;
+  final int cityId;
+  final String city;
+  final int cabinTypeId;
+  final String cabinType;
   final String? coverImageUrl;
+  final Set<int> amenityIds;
+}
+
+class CatalogOption {
+  const CatalogOption(this.id, this.name);
+  factory CatalogOption.fromJson(Map<String, dynamic> json) =>
+      CatalogOption(json['id'] as int, json['name'] as String);
+  final int id;
+  final String name;
+}
+
+class OwnerOption {
+  const OwnerOption(this.id, this.name);
+  factory OwnerOption.fromJson(Map<String, dynamic> json) => OwnerOption(
+    json['id'] as int,
+    '${json['firstName']} ${json['lastName']}',
+  );
+  final int id;
+  final String name;
+}
+
+class CabinFormData {
+  CabinFormData({
+    required this.name,
+    required this.description,
+    required this.address,
+    required this.areaSquareMeters,
+    required this.pricePerNight,
+    required this.maxAdults,
+    required this.maxChildren,
+    required this.bedrooms,
+    required this.bathrooms,
+    required this.cityId,
+    required this.cabinTypeId,
+    required this.amenityIds,
+    this.ownerId,
+    this.latitude,
+    this.longitude,
+    this.coverImageUrl,
+  });
+  final String name;
+  final String description;
+  final String address;
+  final double areaSquareMeters;
+  final double pricePerNight;
+  final int maxAdults;
+  final int maxChildren;
+  final int bedrooms;
+  final int bathrooms;
+  final int cityId;
+  final int cabinTypeId;
+  final int? ownerId;
+  final double? latitude;
+  final double? longitude;
+  final Set<int> amenityIds;
+  final String? coverImageUrl;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'description': description,
+    'address': address,
+    'areaSquareMeters': areaSquareMeters,
+    'pricePerNight': pricePerNight,
+    'maxAdults': maxAdults,
+    'maxChildren': maxChildren,
+    'bedrooms': bedrooms,
+    'bathrooms': bathrooms,
+    'cityId': cityId,
+    'cabinTypeId': cabinTypeId,
+    'ownerId': ownerId,
+    'latitude': latitude,
+    'longitude': longitude,
+    'amenityIds': amenityIds.toList(),
+    'coverImageUrl': coverImageUrl?.trim().isEmpty == true
+        ? null
+        : coverImageUrl?.trim(),
+  };
 }
