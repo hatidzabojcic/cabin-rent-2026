@@ -48,9 +48,46 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
     public Task<UserDto?> GetUserAsync(int id, CancellationToken cancellationToken = default) =>
         dbContext.Users.AsNoTracking().Where(x => x.Id == id).Select(UserProjection()).SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyCollection<ManagedUserDto>> GetManagedUsersAsync(string? search, string? role, bool? isActive, CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Users.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x => x.FirstName.Contains(term) || x.LastName.Contains(term) || x.UserName.Contains(term) || x.Email.Contains(term));
+        }
+        if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Name == role));
+        if (isActive.HasValue) query = query.Where(x => x.IsActive == isActive.Value);
+        return await query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName)
+            .Select(ManagedUserProjection()).ToListAsync(cancellationToken);
+    }
+
+    public async Task<ManagedUserDto?> SetUserActiveAsync(int id, bool isActive, int actorId, CancellationToken cancellationToken = default)
+    {
+        if (!UserManagementRules.CanChangeStatus(id, isActive, actorId))
+            throw new InvalidOperationException("Ne možete deaktivirati vlastiti administratorski nalog.");
+
+        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (user is null) return null;
+        user.IsActive = isActive;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        if (!isActive)
+        {
+            var refreshTokens = await dbContext.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ToListAsync(cancellationToken);
+            foreach (var token in refreshTokens) token.RevokedAtUtc = DateTime.UtcNow;
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.Users.AsNoTracking().Where(x => x.Id == id).Select(ManagedUserProjection()).SingleAsync(cancellationToken);
+    }
+
     private static System.Linq.Expressions.Expression<Func<User, UserDto>> UserProjection() => x =>
         new UserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
             x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList());
+
+    private static System.Linq.Expressions.Expression<Func<User, ManagedUserDto>> ManagedUserProjection() => x =>
+        new ManagedUserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
+            x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.OwnedCabins.Count,
+            x.OwnedCabins.SelectMany(cabin => cabin.Reservations).Count());
 }
 
 public sealed class ReservationService(CabinRentDbContext dbContext) : IReservationService

@@ -15,6 +15,8 @@ public interface IPlatformQueryService
     Task<IReadOnlyCollection<RoleDto>> GetRolesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<UserDto>> GetUsersAsync(string? search, string? role, CancellationToken cancellationToken = default);
     Task<UserDto?> GetUserAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<ManagedUserDto>> GetManagedUsersAsync(string? search, string? role, bool? isActive, CancellationToken cancellationToken = default);
+    Task<ManagedUserDto?> SetUserActiveAsync(int id, bool isActive, int actorId, CancellationToken cancellationToken = default);
 }
 
 public interface IReservationService

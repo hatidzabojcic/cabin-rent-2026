@@ -24,23 +24,24 @@ class DashboardScreen extends StatelessWidget {
           Wrap(
             spacing: 18,
             runSpacing: 18,
-            children: const [
-              _OverviewCard(
+            children: [
+              const _OverviewCard(
                 icon: Icons.cabin_outlined,
                 title: 'Vikendice',
                 description: 'Pregledajte ponudu i osnovne podatke.',
               ),
-              _OverviewCard(
+              const _OverviewCard(
                 icon: Icons.calendar_month_outlined,
                 title: 'Rezervacije',
                 description:
                     'Pregledajte rezervacije i mijenjajte njihove statuse.',
               ),
-              _OverviewCard(
-                icon: Icons.people_outline,
-                title: 'Korisnici',
-                description: 'Administratorski pregled korisnika i uloga.',
-              ),
+              if (user.isAdmin)
+                const _OverviewCard(
+                  icon: Icons.people_outline,
+                  title: 'Korisnici',
+                  description: 'Administratorski pregled korisnika i uloga.',
+                ),
             ],
           ),
         ],

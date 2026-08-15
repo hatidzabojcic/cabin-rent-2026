@@ -6,6 +6,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../cabins/presentation/cabins_screen.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../reservations/presentation/reservations_screen.dart';
+import '../../users/presentation/users_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -36,11 +37,18 @@ class _AppShellState extends State<AppShell> {
         selectedIcon: Icon(Icons.calendar_month),
         label: Text('Rezervacije'),
       ),
+      if (user.isAdmin)
+        const NavigationRailDestination(
+          icon: Icon(Icons.people_outline),
+          selectedIcon: Icon(Icons.people),
+          label: Text('Korisnici'),
+        ),
     ];
     final screens = <Widget>[
       const DashboardScreen(),
       const CabinsScreen(),
       const ReservationsScreen(),
+      if (user.isAdmin) const UsersScreen(),
     ];
 
     return Scaffold(
