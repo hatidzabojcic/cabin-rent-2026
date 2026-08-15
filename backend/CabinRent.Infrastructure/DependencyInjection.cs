@@ -7,6 +7,8 @@ using CabinRent.Services.Auth;
 using CabinRent.Services.Platform;
 using CabinRent.Services.Notifications;
 using CabinRent.Infrastructure.Notifications;
+using CabinRent.Infrastructure.Recommendations;
+using CabinRent.Services.Recommendations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<INotificationEventPublisher, RabbitMqNotificationPublisher>();
+        services.AddScoped<IRecommendationService, RecommendationService>();
         return services;
     }
 }
