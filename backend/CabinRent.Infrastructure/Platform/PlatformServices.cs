@@ -6,6 +6,7 @@ using CabinRent.Model.Reviews;
 using CabinRent.Model.Users;
 using CabinRent.Services.Platform;
 using CabinRent.Services.Notifications;
+using CabinRent.Infrastructure.Cabins;
 using CabinRent.Model.Notifications;
 using Microsoft.EntityFrameworkCore;
 
@@ -115,7 +116,8 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
     public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, int guestId, CancellationToken cancellationToken = default)
     {
         if (request.CheckOut <= request.CheckIn) throw new ArgumentException("Check-out mora biti nakon check-in datuma.");
-        var cabin = await dbContext.Cabins.SingleOrDefaultAsync(x => x.Id == request.CabinId && x.IsActive, cancellationToken)
+        var cabin = await dbContext.Cabins.Where(CabinVisibilityRules.PubliclyVisible)
+            .SingleOrDefaultAsync(x => x.Id == request.CabinId, cancellationToken)
             ?? throw new KeyNotFoundException("Vikendica nije pronađena.");
         if (!await dbContext.Users.AnyAsync(x => x.Id == guestId && x.IsActive, cancellationToken))
             throw new KeyNotFoundException("Gost nije pronađen.");
@@ -204,7 +206,9 @@ public sealed class ReviewService(CabinRentDbContext dbContext, INotificationEve
 {
     public async Task<IReadOnlyCollection<ReviewDto>> GetAsync(int? cabinId, bool? approved, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Reviews.AsNoTracking().AsQueryable();
+        var query = dbContext.Reviews.AsNoTracking()
+            .Where(x => x.Cabin.IsActive && x.Cabin.Owner.IsActive)
+            .AsQueryable();
         if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
         if (approved.HasValue) query = query.Where(x => x.IsApproved == approved);
         return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
@@ -264,12 +268,15 @@ public sealed class ReviewService(CabinRentDbContext dbContext, INotificationEve
 public sealed class FavoriteService(CabinRentDbContext dbContext) : IFavoriteService
 {
     public async Task<IReadOnlyCollection<FavoriteDto>> GetAsync(int userId, CancellationToken cancellationToken = default) =>
-        await dbContext.Favorites.AsNoTracking().Where(x => x.UserId == userId).OrderByDescending(x => x.CreatedAtUtc)
+        await dbContext.Favorites.AsNoTracking()
+            .Where(x => x.UserId == userId && x.Cabin.IsActive && x.Cabin.Owner.IsActive)
+            .OrderByDescending(x => x.CreatedAtUtc)
             .Select(x => new FavoriteDto(x.UserId, x.CabinId, x.Cabin.Name, x.Cabin.PricePerNight, x.CreatedAtUtc)).ToListAsync(cancellationToken);
 
     public async Task<FavoriteDto> AddAsync(AddFavoriteRequest request, int userId, CancellationToken cancellationToken = default)
     {
-        if (!await dbContext.Users.AnyAsync(x => x.Id == userId, cancellationToken) || !await dbContext.Cabins.AnyAsync(x => x.Id == request.CabinId, cancellationToken))
+        if (!await dbContext.Users.AnyAsync(x => x.Id == userId && x.IsActive, cancellationToken)
+            || !await dbContext.Cabins.Where(CabinVisibilityRules.PubliclyVisible).AnyAsync(x => x.Id == request.CabinId, cancellationToken))
             throw new KeyNotFoundException("Korisnik ili vikendica nije pronađena.");
         var existing = await dbContext.Favorites.FindAsync([userId, request.CabinId], cancellationToken);
         if (existing is null)

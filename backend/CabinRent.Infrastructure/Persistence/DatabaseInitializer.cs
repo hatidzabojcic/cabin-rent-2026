@@ -18,6 +18,7 @@ public static class DatabaseInitializer
         await SeedReferenceDataAsync(dbContext, cancellationToken);
         await SeedUsersAsync(dbContext, configuration, cancellationToken);
         await SeedDemoDataAsync(dbContext, cancellationToken);
+        await SeedSecondaryOwnerDataAsync(dbContext, configuration, cancellationToken);
     }
 
     private static async Task SeedReferenceDataAsync(CabinRentDbContext dbContext, CancellationToken cancellationToken)
@@ -92,6 +93,7 @@ public static class DatabaseInitializer
         {
             new SeedAccount("Admin", "Admin", "CabinRent", "admin@cabinrent.local", "AdminUserName", "AdminPassword"),
             new SeedAccount("Owner", "Demo", "Owner", "owner@cabinrent.local", "OwnerUserName", "OwnerPassword"),
+            new SeedAccount("Owner", "Test", "Owner", "owner2@cabinrent.local", "Owner2UserName", "Owner2Password"),
             new SeedAccount("Guest", "Demo", "Guest", "guest@cabinrent.local", "GuestUserName", "GuestPassword")
         };
 
@@ -118,6 +120,58 @@ public static class DatabaseInitializer
             });
         }
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedSecondaryOwnerDataAsync(
+        CabinRentDbContext dbContext,
+        IConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        const string cabinName = "Blidinje hideaway";
+        if (await dbContext.Cabins.AnyAsync(x => x.Name == cabinName, cancellationToken)) return;
+
+        var ownerUserName = configuration["Seed:Owner2UserName"]?.Trim().ToLowerInvariant()
+            ?? throw new InvalidOperationException("Second owner seed username is missing.");
+        var owner = await dbContext.Users.SingleAsync(x => x.UserName == ownerUserName, cancellationToken);
+        var city = await dbContext.Cities.SingleAsync(x => x.Name == "Mostar", cancellationToken);
+        var cabinType = await dbContext.CabinTypes.SingleAsync(x => x.Name == "Brvnara", cancellationToken);
+        var amenityIds = await dbContext.Amenities
+            .Where(x => x.Name == "Wi-Fi" || x.Name == "Parking" || x.Name == "Kamin")
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var cabin = new Cabin
+        {
+            Name = cabinName,
+            Description = "Mirna planinska brvnara u blizini Parka prirode Blidinje, pogodna za porodični odmor.",
+            Address = "Blidinje bb",
+            AreaSquareMeters = 82,
+            PricePerNight = 165,
+            MaxAdults = 4,
+            MaxChildren = 2,
+            Bedrooms = 2,
+            Bathrooms = 1,
+            Latitude = 43.604,
+            Longitude = 17.493,
+            Owner = owner,
+            City = city,
+            CabinType = cabinType,
+            Images =
+            [
+                new CabinImage
+                {
+                    Url = "https://images.unsplash.com/photo-1520984032042-162d526883e0?auto=format&fit=crop&w=1200&q=80",
+                    AltText = cabinName,
+                    IsCover = true,
+                    SortOrder = 1
+                }
+            ]
+        };
+        cabin.CabinAmenities = amenityIds
+            .Select(id => new CabinAmenity { Cabin = cabin, AmenityId = id })
+            .ToList();
+        dbContext.Cabins.Add(cabin);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

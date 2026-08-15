@@ -12,7 +12,7 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
     {
         var page = Math.Max(request.Page, 1);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
-        var query = dbContext.Cabins.AsNoTracking().Where(x => x.IsActive);
+        var query = dbContext.Cabins.AsNoTracking().Where(CabinVisibilityRules.PubliclyVisible);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
             query = query.Where(x => x.Name.Contains(request.Search) || x.Description.Contains(request.Search));
@@ -46,7 +46,7 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
     }
 
     public Task<CabinDetailsDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        dbContext.Cabins.AsNoTracking().Where(x => x.Id == id && x.IsActive)
+        dbContext.Cabins.AsNoTracking().Where(CabinVisibilityRules.PubliclyVisible).Where(x => x.Id == id)
             .Select(DetailsProjection())
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -149,7 +149,7 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
     private static System.Linq.Expressions.Expression<Func<Cabin, CabinDetailsDto>> DetailsProjection() => x =>
         new CabinDetailsDto(x.Id, x.Name, x.Description, x.Address, x.AreaSquareMeters, x.PricePerNight,
             x.MaxAdults, x.MaxChildren, x.Bedrooms, x.Bathrooms, x.Latitude, x.Longitude, x.IsActive,
-            x.OwnerId, x.Owner.FirstName + " " + x.Owner.LastName, x.CityId, x.City.Name,
+            x.OwnerId, x.Owner.FirstName + " " + x.Owner.LastName, x.Owner.IsActive, x.CityId, x.City.Name,
             x.CabinTypeId, x.CabinType.Name,
             x.Images.OrderBy(i => i.SortOrder).Select(i => new CabinImageDto(i.Id, i.Url, i.AltText, i.SortOrder, i.IsCover)).ToList(),
             x.CabinAmenities.OrderBy(a => a.Amenity.Name).Select(a => new CabinAmenityDto(a.AmenityId, a.Amenity.Name, a.Amenity.Icon)).ToList());

@@ -10,6 +10,7 @@ Vrijednosti ispod služe isključivo lokalnom razvoju. Njihov trajni izvor je `.
 |---|---|---|
 | Aplikacija – admin | `admin` | `Admin123!` |
 | Aplikacija – vlasnik | `owner` | `Owner123!` |
+| Aplikacija – drugi vlasnik | `owner2` | `Owner2_123!` |
 | Aplikacija – gost | `guest` | `Guest123!` |
 | SQL Server | `sa` | vrijednost `MSSQL_SA_PASSWORD` iz `.env` |
 | RabbitMQ | vrijednost `RABBITMQ_USER` | vrijednost `RABBITMQ_PASSWORD` |

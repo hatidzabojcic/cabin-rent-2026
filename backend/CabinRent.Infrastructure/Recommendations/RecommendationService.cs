@@ -2,6 +2,7 @@ using CabinRent.Infrastructure.Persistence;
 using CabinRent.Model.Recommendations;
 using CabinRent.Services.Recommendations;
 using Microsoft.EntityFrameworkCore;
+using CabinRent.Infrastructure.Cabins;
 
 namespace CabinRent.Infrastructure.Recommendations;
 
@@ -34,7 +35,8 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
                 .Select(x => x.GuestId).Distinct().ToArrayAsync(cancellationToken);
 
         var candidates = await dbContext.Cabins.AsNoTracking()
-            .Where(x => x.IsActive && !completedCabinIds.Contains(x.Id))
+            .Where(CabinVisibilityRules.PubliclyVisible)
+            .Where(x => !completedCabinIds.Contains(x.Id))
             .Select(x => new Candidate(
                 x.Id,
                 x.Name,

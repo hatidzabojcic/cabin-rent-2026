@@ -201,7 +201,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 380,
-        mainAxisExtent: 350,
+        mainAxisExtent: 390,
         crossAxisSpacing: 18,
         mainAxisSpacing: 18,
       ),
@@ -233,6 +233,7 @@ class _CabinCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
+    color: cabin.ownerIsActive ? null : const Color(0xFFF1F0EC),
     clipBehavior: Clip.antiAlias,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,20 +243,23 @@ class _CabinCard extends StatelessWidget {
           child: SizedBox(
             height: 95,
             width: double.infinity,
-            child: cabin.coverImageUrl == null
-                ? const ColoredBox(
-                    color: Color(0xFFE8EFEA),
-                    child: Icon(Icons.photo_library_outlined, size: 38),
-                  )
-                : Image.network(
-                    cabinImageUrl(cabin.coverImageUrl!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const ColoredBox(
-                          color: Color(0xFFE8EFEA),
-                          child: Icon(Icons.broken_image_outlined, size: 38),
-                        ),
-                  ),
+            child: Opacity(
+              opacity: cabin.ownerIsActive ? 1 : .55,
+              child: cabin.coverImageUrl == null
+                  ? const ColoredBox(
+                      color: Color(0xFFE8EFEA),
+                      child: Icon(Icons.photo_library_outlined, size: 38),
+                    )
+                  : Image.network(
+                      cabinImageUrl(cabin.coverImageUrl!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const ColoredBox(
+                            color: Color(0xFFE8EFEA),
+                            child: Icon(Icons.broken_image_outlined, size: 38),
+                          ),
+                    ),
+            ),
           ),
         ),
         Expanded(
@@ -319,6 +323,36 @@ class _CabinCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (showOwner && !cabin.ownerIsActive) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE8C7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2A94F)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.person_off_outlined, size: 17),
+                        SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            'Owner neaktivan – rezervacije nisu dostupne',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   cabin.name,
@@ -344,7 +378,9 @@ class _CabinCard extends StatelessWidget {
                 Text(
                   '${cabin.pricePerNight.toStringAsFixed(2)} KM / noć',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: cabin.isPubliclyAvailable
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.black54,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

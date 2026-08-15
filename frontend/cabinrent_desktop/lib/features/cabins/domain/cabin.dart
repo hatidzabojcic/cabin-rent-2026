@@ -13,6 +13,7 @@ class Cabin {
     required this.isActive,
     required this.ownerId,
     required this.ownerName,
+    required this.ownerIsActive,
     required this.cityId,
     required this.city,
     required this.cabinTypeId,
@@ -39,6 +40,7 @@ class Cabin {
     isActive: json['isActive'] as bool,
     ownerId: json['ownerId'] as int,
     ownerName: json['ownerName'] as String,
+    ownerIsActive: json['ownerIsActive'] as bool,
     cityId: json['cityId'] as int,
     city: json['city'] as String,
     cabinTypeId: json['cabinTypeId'] as int,
@@ -66,6 +68,7 @@ class Cabin {
   final bool isActive;
   final int ownerId;
   final String ownerName;
+  final bool ownerIsActive;
   final int cityId;
   final String city;
   final int cabinTypeId;
@@ -75,6 +78,7 @@ class Cabin {
 
   String? get coverImageUrl =>
       images.where((image) => image.isCover).firstOrNull?.url;
+  bool get isPubliclyAvailable => isActive && ownerIsActive;
 }
 
 class CabinImage {

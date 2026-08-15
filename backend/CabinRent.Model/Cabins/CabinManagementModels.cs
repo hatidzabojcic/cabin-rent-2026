@@ -21,6 +21,7 @@ public sealed record CabinDetailsDto(
     bool IsActive,
     int OwnerId,
     string OwnerName,
+    bool OwnerIsActive,
     int CityId,
     string City,
     int CabinTypeId,

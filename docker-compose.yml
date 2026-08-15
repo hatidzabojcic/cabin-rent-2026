@@ -43,6 +43,8 @@ services:
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD}
       Seed__OwnerUserName: ${SEED_OWNER_USERNAME}
       Seed__OwnerPassword: ${SEED_OWNER_PASSWORD}
+      Seed__Owner2UserName: ${SEED_OWNER2_USERNAME}
+      Seed__Owner2Password: ${SEED_OWNER2_PASSWORD}
       Seed__GuestUserName: ${SEED_GUEST_USERNAME}
       Seed__GuestPassword: ${SEED_GUEST_PASSWORD}
       ImageStorage__RootPath: /app/uploads
