@@ -8,6 +8,8 @@ import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 import '../../reviews/presentation/reviews_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
+import '../../notifications/presentation/notifications_controller.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../users/presentation/users_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -18,11 +20,28 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  late final NotificationsController _notificationsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationsController = context.read<NotificationsController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notificationsController.start();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationsController.stop();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
     final user = auth.user!;
+    final unreadCount = context.watch<NotificationsController>().unreadCount;
     final destinations = <NavigationRailDestination>[
       const NavigationRailDestination(
         icon: Icon(Icons.dashboard_outlined),
@@ -49,6 +68,11 @@ class _AppShellState extends State<AppShell> {
         selectedIcon: Icon(Icons.bar_chart),
         label: Text('Izvještaji'),
       ),
+      NavigationRailDestination(
+        icon: _NotificationIcon(count: unreadCount),
+        selectedIcon: _NotificationIcon(count: unreadCount, selected: true),
+        label: const Text('Obavijesti'),
+      ),
       if (user.isAdmin)
         const NavigationRailDestination(
           icon: Icon(Icons.people_outline),
@@ -62,6 +86,7 @@ class _AppShellState extends State<AppShell> {
       const ReservationsScreen(),
       const ReviewsScreen(),
       const ReportsScreen(),
+      const NotificationsScreen(),
       if (user.isAdmin) const UsersScreen(),
     ];
 
@@ -138,4 +163,16 @@ class _AppShellState extends State<AppShell> {
       ),
     );
   }
+}
+
+class _NotificationIcon extends StatelessWidget {
+  const _NotificationIcon({required this.count, this.selected = false});
+  final int count;
+  final bool selected;
+  @override
+  Widget build(BuildContext context) => Badge(
+    isLabelVisible: count > 0,
+    label: Text(count > 99 ? '99+' : count.toString()),
+    child: Icon(selected ? Icons.notifications : Icons.notifications_outlined),
+  );
 }

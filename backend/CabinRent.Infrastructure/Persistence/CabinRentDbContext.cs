@@ -18,6 +18,7 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<AvailabilityBlock> AvailabilityBlocks => Set<AvailabilityBlock>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +37,8 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<Review>().HasIndex(x => x.ReservationId).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
+        modelBuilder.Entity<Notification>().HasIndex(x => x.EventId).IsUnique();
+        modelBuilder.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAtUtc });
 
         modelBuilder.Entity<Cabin>().Property(x => x.PricePerNight).HasPrecision(10, 2);
         modelBuilder.Entity<Cabin>().Property(x => x.AreaSquareMeters).HasPrecision(8, 2);

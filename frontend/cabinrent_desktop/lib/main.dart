@@ -10,6 +10,8 @@ import 'features/cabins/data/cabins_repository.dart';
 import 'features/reservations/data/reservations_repository.dart';
 import 'features/reviews/data/reviews_repository.dart';
 import 'features/reports/data/reports_repository.dart';
+import 'features/notifications/data/notifications_repository.dart';
+import 'features/notifications/presentation/notifications_controller.dart';
 import 'features/users/data/users_repository.dart';
 
 void main() {
@@ -18,6 +20,7 @@ void main() {
   final apiClient = ApiClient();
   final tokenStorage = TokenStorage();
   final authRepository = AuthRepository(apiClient, tokenStorage);
+  final notificationsRepository = NotificationsRepository(apiClient);
 
   runApp(
     MultiProvider(
@@ -27,6 +30,10 @@ void main() {
         Provider.value(value: ReservationsRepository(apiClient)),
         Provider.value(value: ReviewsRepository(apiClient)),
         Provider.value(value: ReportsRepository(apiClient)),
+        Provider.value(value: notificationsRepository),
+        ChangeNotifierProvider(
+          create: (_) => NotificationsController(notificationsRepository),
+        ),
         Provider.value(value: UsersRepository(apiClient)),
         ChangeNotifierProvider(
           create: (_) => AuthController(authRepository)..restoreSession(),

@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CabinRent.Infrastructure\CabinRent.Infrastructure.csproj" />
+    <ProjectReference Include="..\CabinRent.Model\CabinRent.Model.csproj" />
   </ItemGroup>
 </Project>

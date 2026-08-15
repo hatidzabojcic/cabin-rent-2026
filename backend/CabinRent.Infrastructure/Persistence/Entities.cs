@@ -20,6 +20,7 @@ public sealed class User : Entity
     public ICollection<UserRole> UserRoles { get; set; } = [];
     public ICollection<Cabin> OwnedCabins { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+    public ICollection<Notification> Notifications { get; set; } = [];
 }
 
 public sealed class Role : Entity
@@ -183,6 +184,20 @@ public sealed class RefreshToken : Entity
     public string? ReplacedByTokenHash { get; set; }
     public string? CreatedByIp { get; set; }
     public string? RevokedByIp { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+}
+
+public sealed class Notification : Entity
+{
+    public Guid EventId { get; set; }
+    public required string Type { get; set; }
+    public required string Title { get; set; }
+    public required string Message { get; set; }
+    public string? RelatedEntityType { get; set; }
+    public int? RelatedEntityId { get; set; }
+    public bool IsRead { get; set; }
+    public DateTime? ReadAtUtc { get; set; }
     public int UserId { get; set; }
     public User User { get; set; } = null!;
 }

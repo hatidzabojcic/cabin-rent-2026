@@ -47,6 +47,11 @@ class DashboardScreen extends StatelessWidget {
                 title: 'Izvještaji',
                 description: 'Pratite godišnju posjećenost i ostvareni prihod.',
               ),
+              const _OverviewCard(
+                icon: Icons.notifications_outlined,
+                title: 'Obavijesti',
+                description: 'Pratite novosti o rezervacijama i recenzijama.',
+              ),
               if (user.isAdmin)
                 const _OverviewCard(
                   icon: Icons.people_outline,

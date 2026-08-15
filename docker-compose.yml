@@ -46,6 +46,10 @@ services:
       Seed__GuestUserName: ${SEED_GUEST_USERNAME}
       Seed__GuestPassword: ${SEED_GUEST_PASSWORD}
       ImageStorage__RootPath: /app/uploads
+      RabbitMq__Host: cabinrent-rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD}
     ports:
       - "8080:8080"
     depends_on:
@@ -53,6 +57,23 @@ services:
         condition: service_healthy
     volumes:
       - cabinrent-images:/app/uploads
+    networks: [cabinrent-network]
+
+  cabinrent-notifications:
+    build:
+      context: .
+      dockerfile: backend/CabinRent.Notifications/Dockerfile
+    environment:
+      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=CabinRent;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+      RabbitMq__Host: cabinrent-rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD}
+    depends_on:
+      cabinrent-sql:
+        condition: service_healthy
+      cabinrent-rabbitmq:
+        condition: service_started
     networks: [cabinrent-network]
 
 volumes:
