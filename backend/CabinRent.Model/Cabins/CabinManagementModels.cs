@@ -52,3 +52,10 @@ public sealed class SetCabinActiveRequest
 {
     public bool IsActive { get; init; }
 }
+
+public sealed class UpdateCabinImageRequest
+{
+    [MaxLength(300)] public string? AltText { get; init; }
+    [Range(0, 1000)] public int SortOrder { get; init; }
+    public bool IsCover { get; init; }
+}

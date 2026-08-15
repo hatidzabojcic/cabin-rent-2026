@@ -45,15 +45,19 @@ services:
       Seed__OwnerPassword: ${SEED_OWNER_PASSWORD}
       Seed__GuestUserName: ${SEED_GUEST_USERNAME}
       Seed__GuestPassword: ${SEED_GUEST_PASSWORD}
+      ImageStorage__RootPath: /app/uploads
     ports:
       - "8080:8080"
     depends_on:
       cabinrent-sql:
         condition: service_healthy
+    volumes:
+      - cabinrent-images:/app/uploads
     networks: [cabinrent-network]
 
 volumes:
   cabinrent-sql-data:
+  cabinrent-images:
 
 networks:
   cabinrent-network:

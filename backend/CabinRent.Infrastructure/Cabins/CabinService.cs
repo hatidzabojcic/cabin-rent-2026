@@ -45,12 +45,9 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
         return new PagedResult<CabinDto>(items, totalCount, page, pageSize);
     }
 
-    public Task<CabinDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+    public Task<CabinDetailsDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         dbContext.Cabins.AsNoTracking().Where(x => x.Id == id && x.IsActive)
-            .Select(x => new CabinDto(
-                x.Id, x.Name, x.City.Name, x.PricePerNight, x.MaxAdults + x.MaxChildren,
-                dbContext.Reviews.Where(r => r.CabinId == x.Id && r.IsApproved).Select(r => (double?)r.Rating).Average(),
-                x.Images.Where(i => i.IsCover).Select(i => i.Url).FirstOrDefault()))
+            .Select(DetailsProjection())
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyCollection<CabinDetailsDto>> GetManagedAsync(int actorId, bool isAdmin, CancellationToken cancellationToken = default)
@@ -137,7 +134,7 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
         var currentCover = cabin.Images.FirstOrDefault(x => x.IsCover);
         if (string.IsNullOrWhiteSpace(request.CoverImageUrl))
         {
-            if (currentCover is not null) cabin.Images.Remove(currentCover);
+            return;
         }
         else if (currentCover is null)
         {

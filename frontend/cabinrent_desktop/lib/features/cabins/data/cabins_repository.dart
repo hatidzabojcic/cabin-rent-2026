@@ -10,6 +10,10 @@ class CabinsRepository {
     authenticated: true,
   )).map((item) => Cabin.fromJson(item as Map<String, dynamic>)).toList();
 
+  Future<Cabin> getManagedCabin(int id) async => Cabin.fromJson(
+    await _api.getObject('/api/cabins/manage/$id', authenticated: true),
+  );
+
   Future<Cabin> create(CabinFormData data) async => Cabin.fromJson(
     await _api.post('/api/cabins', body: data.toJson(), authenticated: true),
   );
@@ -25,6 +29,39 @@ class CabinsRepository {
       authenticated: true,
     ),
   );
+
+  Future<CabinImage> uploadImage(
+    int cabinId,
+    List<int> bytes,
+    String fileName,
+  ) async => CabinImage.fromJson(
+    await _api.uploadFile(
+      '/api/cabins/$cabinId/images',
+      bytes: bytes,
+      fileName: fileName,
+      authenticated: true,
+    ),
+  );
+
+  Future<CabinImage> updateImage(
+    int cabinId,
+    CabinImage image, {
+    required bool isCover,
+    required int sortOrder,
+  }) async => CabinImage.fromJson(
+    await _api.patch(
+      '/api/cabins/$cabinId/images/${image.id}',
+      body: {
+        'altText': image.altText,
+        'sortOrder': sortOrder,
+        'isCover': isCover,
+      },
+      authenticated: true,
+    ),
+  );
+
+  Future<void> deleteImage(int cabinId, int imageId) =>
+      _api.delete('/api/cabins/$cabinId/images/$imageId', authenticated: true);
 
   Future<List<CatalogOption>> getCities() => _catalog('/api/catalog/cities');
   Future<List<CatalogOption>> getCabinTypes() =>

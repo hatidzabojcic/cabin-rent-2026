@@ -20,7 +20,7 @@ class Cabin {
     required this.amenityIds,
     this.latitude,
     this.longitude,
-    this.coverImageUrl,
+    required this.images,
   });
 
   factory Cabin.fromJson(Map<String, dynamic> json) => Cabin(
@@ -43,11 +43,9 @@ class Cabin {
     city: json['city'] as String,
     cabinTypeId: json['cabinTypeId'] as int,
     cabinType: json['cabinType'] as String,
-    coverImageUrl: (json['images'] as List<dynamic>)
-        .cast<Map<String, dynamic>>()
-        .where((image) => image['isCover'] as bool)
-        .map((image) => image['url'] as String)
-        .firstOrNull,
+    images: (json['images'] as List<dynamic>)
+        .map((image) => CabinImage.fromJson(image as Map<String, dynamic>))
+        .toList(),
     amenityIds: (json['amenities'] as List<dynamic>)
         .map((item) => (item as Map<String, dynamic>)['id'] as int)
         .toSet(),
@@ -72,8 +70,33 @@ class Cabin {
   final String city;
   final int cabinTypeId;
   final String cabinType;
-  final String? coverImageUrl;
+  final List<CabinImage> images;
   final Set<int> amenityIds;
+
+  String? get coverImageUrl =>
+      images.where((image) => image.isCover).firstOrNull?.url;
+}
+
+class CabinImage {
+  const CabinImage({
+    required this.id,
+    required this.url,
+    required this.sortOrder,
+    required this.isCover,
+    this.altText,
+  });
+  factory CabinImage.fromJson(Map<String, dynamic> json) => CabinImage(
+    id: json['id'] as int,
+    url: json['url'] as String,
+    altText: json['altText'] as String?,
+    sortOrder: json['sortOrder'] as int,
+    isCover: json['isCover'] as bool,
+  );
+  final int id;
+  final String url;
+  final String? altText;
+  final int sortOrder;
+  final bool isCover;
 }
 
 class CatalogOption {

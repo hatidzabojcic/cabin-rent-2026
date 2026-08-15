@@ -9,6 +9,7 @@ using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +72,13 @@ var app = builder.Build();
 await app.Services.InitializeDatabaseAsync(app.Configuration);
 
 app.UseExceptionHandler();
+var imageRoot = builder.Configuration["ImageStorage:RootPath"] ?? Path.Combine(AppContext.BaseDirectory, "uploads");
+Directory.CreateDirectory(imageRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(imageRoot),
+    RequestPath = "/uploads"
+});
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

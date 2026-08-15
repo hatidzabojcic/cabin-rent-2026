@@ -6,6 +6,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/cabins_repository.dart';
 import '../domain/cabin.dart';
 import 'cabin_form_dialog.dart';
+import 'cabin_gallery_dialog.dart';
 
 class CabinsScreen extends StatefulWidget {
   const CabinsScreen({super.key});
@@ -62,6 +63,15 @@ class _CabinsScreenState extends State<CabinsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _openGallery(Cabin cabin) async {
+    final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => CabinGalleryDialog(cabin: cabin),
+    );
+    if (changed == true) await _load();
   }
 
   Future<void> _toggleActive(Cabin cabin) async {
@@ -191,7 +201,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 380,
-        mainAxisExtent: 260,
+        mainAxisExtent: 350,
         crossAxisSpacing: 18,
         mainAxisSpacing: 18,
       ),
@@ -200,6 +210,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
         cabin: cabins[index],
         showOwner: isAdmin,
         onEdit: () => _openForm(cabins[index]),
+        onGallery: () => _openGallery(cabins[index]),
         onToggleActive: () => _toggleActive(cabins[index]),
       ),
     );
@@ -211,89 +222,137 @@ class _CabinCard extends StatelessWidget {
     required this.cabin,
     required this.showOwner,
     required this.onEdit,
+    required this.onGallery,
     required this.onToggleActive,
   });
   final Cabin cabin;
   final bool showOwner;
   final VoidCallback onEdit;
+  final VoidCallback onGallery;
   final VoidCallback onToggleActive;
 
   @override
   Widget build(BuildContext context) => Card(
     clipBehavior: Clip.antiAlias,
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(child: const Icon(Icons.cabin_outlined)),
-              const SizedBox(width: 10),
-              Chip(
-                label: Text(cabin.isActive ? 'Aktivna' : 'Neaktivna'),
-                avatar: Icon(
-                  cabin.isActive ? Icons.check_circle : Icons.pause_circle,
-                  size: 17,
-                ),
-              ),
-              const Spacer(),
-              PopupMenuButton<String>(
-                onSelected: (value) =>
-                    value == 'edit' ? onEdit() : onToggleActive(),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: ListTile(
-                      leading: Icon(Icons.edit_outlined),
-                      title: Text('Uredi'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onGallery,
+          child: SizedBox(
+            height: 95,
+            width: double.infinity,
+            child: cabin.coverImageUrl == null
+                ? const ColoredBox(
+                    color: Color(0xFFE8EFEA),
+                    child: Icon(Icons.photo_library_outlined, size: 38),
+                  )
+                : Image.network(
+                    cabinImageUrl(cabin.coverImageUrl!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const ColoredBox(
+                          color: Color(0xFFE8EFEA),
+                          child: Icon(Icons.broken_image_outlined, size: 38),
+                        ),
                   ),
-                  PopupMenuItem(
-                    value: 'active',
-                    child: ListTile(
-                      leading: Icon(
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(child: const Icon(Icons.cabin_outlined)),
+                    const SizedBox(width: 10),
+                    Chip(
+                      label: Text(cabin.isActive ? 'Aktivna' : 'Neaktivna'),
+                      avatar: Icon(
                         cabin.isActive
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
+                            ? Icons.check_circle
+                            : Icons.pause_circle,
+                        size: 17,
                       ),
-                      title: Text(cabin.isActive ? 'Deaktiviraj' : 'Aktiviraj'),
-                      contentPadding: EdgeInsets.zero,
                     ),
+                    const Spacer(),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') onEdit();
+                        if (value == 'gallery') onGallery();
+                        if (value == 'active') onToggleActive();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Uredi'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'gallery',
+                          child: ListTile(
+                            leading: Icon(Icons.photo_library_outlined),
+                            title: Text('Galerija'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'active',
+                          child: ListTile(
+                            leading: Icon(
+                              cabin.isActive
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                            title: Text(
+                              cabin.isActive ? 'Deaktiviraj' : 'Aktiviraj',
+                            ),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  cabin.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            cabin.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Text('${cabin.city}  •  ${cabin.cabinType}'),
-          Text(
-            '${cabin.maxAdults + cabin.maxChildren} gostiju  •  ${cabin.bedrooms} spavaćih soba',
-          ),
-          if (showOwner)
-            Text(
-              'Vlasnik: ${cabin.ownerName}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          const SizedBox(height: 14),
-          Text(
-            '${cabin.pricePerNight.toStringAsFixed(2)} KM / noć',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w700,
+                ),
+                const SizedBox(height: 6),
+                Text('${cabin.city}  •  ${cabin.cabinType}'),
+                Text(
+                  '${cabin.maxAdults + cabin.maxChildren} gostiju  •  ${cabin.bedrooms} spavaćih soba',
+                ),
+                if (showOwner)
+                  Text(
+                    'Vlasnik: ${cabin.ownerName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 14),
+                Text(
+                  '${cabin.pricePerNight.toStringAsFixed(2)} KM / noć',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }

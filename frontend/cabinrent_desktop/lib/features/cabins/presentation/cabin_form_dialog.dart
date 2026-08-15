@@ -50,7 +50,6 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
       ),
       'latitude': TextEditingController(text: cabin?.latitude?.toString()),
       'longitude': TextEditingController(text: cabin?.longitude?.toString()),
-      'cover': TextEditingController(text: cabin?.coverImageUrl),
     };
     _cityId = cabin?.cityId;
     _typeId = cabin?.cabinTypeId;
@@ -148,7 +147,7 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
       longitude: double.tryParse(
         _fields['longitude']!.text.replaceAll(',', '.'),
       ),
-      coverImageUrl: _fields['cover']!.text,
+      coverImageUrl: null,
     );
     try {
       final repository = context.read<CabinsRepository>();
@@ -367,7 +366,7 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                                   .toList(),
                             ),
                             const SizedBox(height: 22),
-                            const _SectionTitle('Lokacija i naslovna slika'),
+                            const _SectionTitle('Lokacija'),
                             Row(
                               children: [
                                 Expanded(
@@ -385,10 +384,10 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
-                            _textField(
-                              'cover',
-                              'URL naslovne fotografije (opcionalno)',
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Fotografijama možete upravljati kroz opciju Galerija nakon čuvanja vikendice.',
+                              style: TextStyle(color: Colors.black54),
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 16),

@@ -34,6 +34,9 @@ public static class DependencyInjection
         services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwtOptions));
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICabinService, CabinService>();
+        var imageRoot = configuration["ImageStorage:RootPath"] ?? Path.Combine(AppContext.BaseDirectory, "uploads");
+        services.AddSingleton<IImageStorage>(new LocalImageStorage(imageRoot));
+        services.AddScoped<ICabinImageService, CabinImageService>();
         services.AddScoped<IPlatformQueryService, PlatformQueryService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IReviewService, ReviewService>();
