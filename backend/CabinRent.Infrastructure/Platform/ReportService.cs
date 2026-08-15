@@ -45,10 +45,59 @@ public sealed class ReportService(CabinRentDbContext dbContext) : IReportService
             reservations.Sum(x => x.Adults + x.Children), completedReservations.Sum(x => x.TotalPrice), months, cabinReports);
     }
 
+    public async Task<TopGuestsReportDto> GetTopGuestsAsync(
+        int year, int? cabinId, int limit, CancellationToken cancellationToken = default)
+    {
+        if (!ReportRules.IsValidYear(year)) throw new ArgumentException("Godina mora biti između 2000. i 2100.");
+        if (cabinId.HasValue && !await dbContext.Cabins.AnyAsync(x => x.Id == cabinId.Value, cancellationToken))
+            throw new KeyNotFoundException("Vikendica nije pronađena.");
+
+        var query = dbContext.Reservations.AsNoTracking()
+            .Where(x => x.CheckIn.Year == year
+                && (x.Status == ReservationStatus.Confirmed || x.Status == ReservationStatus.Completed));
+        if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId.Value);
+
+        var reservations = await query
+            .Select(x => new GuestReservationReportData(
+                x.GuestId,
+                x.Guest.FirstName + " " + x.Guest.LastName,
+                x.Guest.Email,
+                x.Guest.PhoneNumber,
+                x.CabinId,
+                x.CheckIn,
+                x.CheckOut,
+                x.TotalPrice,
+                x.Status))
+            .ToListAsync(cancellationToken);
+
+        var guests = reservations.GroupBy(x => new { x.GuestId, x.GuestName, x.Email, x.PhoneNumber })
+            .Select(group =>
+            {
+                var completed = group.Where(x => x.Status == ReservationStatus.Completed).ToList();
+                return new TopGuestDto(
+                    group.Key.GuestId,
+                    group.Key.GuestName,
+                    group.Key.Email,
+                    group.Key.PhoneNumber,
+                    group.Count(),
+                    completed.Count,
+                    completed.Sum(x => ReportRules.Nights(x.CheckIn, x.CheckOut)),
+                    completed.Select(x => x.CabinId).Distinct().Count(),
+                    completed.Sum(x => x.TotalPrice));
+            });
+
+        return new TopGuestsReportDto(year, cabinId, ReportRules.RankGuests(guests, limit));
+    }
+
     private static int Nights(ReservationReportData reservation) =>
         ReportRules.Nights(reservation.CheckIn, reservation.CheckOut);
 
     private sealed record ReservationReportData(
         int CabinId, DateOnly CheckIn, DateOnly CheckOut, int Adults, int Children,
         decimal TotalPrice, ReservationStatus Status);
+
+    private sealed record GuestReservationReportData(
+        int GuestId, string GuestName, string Email, string? PhoneNumber,
+        int CabinId, DateOnly CheckIn, DateOnly CheckOut, decimal TotalPrice,
+        ReservationStatus Status);
 }

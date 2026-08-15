@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../cabins/data/cabins_repository.dart';
 import '../../cabins/domain/cabin.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/reports_repository.dart';
 import '../domain/annual_report.dart';
+import '../domain/top_guests_report.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -14,11 +16,15 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   AnnualReport? _report;
+  TopGuestsReport? _topGuestsReport;
   List<Cabin> _cabins = [];
   bool _loading = true;
   String? _error;
   int _year = DateTime.now().year;
   int? _cabinId;
+  bool _showTopGuests = false;
+
+  bool get _isAdmin => context.read<AuthController>().user?.isAdmin ?? false;
 
   @override
   void initState() {
@@ -32,17 +38,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<Object?>([
         context.read<ReportsRepository>().getAnnualReport(
           _year,
           cabinId: _cabinId,
         ),
         context.read<CabinsRepository>().getManagedCabins(),
+        if (_isAdmin)
+          context.read<ReportsRepository>().getTopGuests(
+            _year,
+            cabinId: _cabinId,
+          )
+        else
+          Future<TopGuestsReport?>.value(),
       ]);
       if (!mounted) return;
       setState(() {
         _report = results[0] as AnnualReport;
         _cabins = results[1] as List<Cabin>;
+        _topGuestsReport = results[2] as TopGuestsReport?;
       });
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -87,6 +101,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ],
           ),
           const SizedBox(height: 22),
+          if (_isAdmin) ...[
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  icon: Icon(Icons.analytics_outlined),
+                  label: Text('Godišnji pregled'),
+                ),
+                ButtonSegment(
+                  value: true,
+                  icon: Icon(Icons.people_alt_outlined),
+                  label: Text('Najčešći gosti'),
+                ),
+              ],
+              selected: {_showTopGuests},
+              onSelectionChanged: (selection) =>
+                  setState(() => _showTopGuests = selection.first),
+            ),
+            const SizedBox(height: 18),
+          ],
           Wrap(
             spacing: 14,
             runSpacing: 12,
@@ -165,6 +199,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       );
     }
+    if (_showTopGuests && _isAdmin) return _topGuestsContent();
     final report = _report!;
     return SingleChildScrollView(
       child: Column(
@@ -209,6 +244,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const SizedBox(height: 12),
           _CabinRanking(cabins: report.cabins),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _topGuestsContent() {
+    final report = _topGuestsReport;
+    if (report == null) {
+      return const Center(child: Text('Izvještaj nije dostupan.'));
+    }
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Najčešći gosti – ${report.year}.',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Rangiranje prema završenim boravcima, ostvarenim noćenjima i potrošnji.',
+          ),
+          const SizedBox(height: 14),
+          _TopGuestsRanking(guests: report.guests),
           const SizedBox(height: 20),
         ],
       ),
@@ -396,6 +456,69 @@ class _CabinRanking extends StatelessWidget {
                 DataCell(Text(cabin.nights.toString())),
                 DataCell(Text(cabin.guests.toString())),
                 DataCell(Text('${cabin.revenue.toStringAsFixed(2)} KM')),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopGuestsRanking extends StatelessWidget {
+  const _TopGuestsRanking({required this.guests});
+  final List<TopGuest> guests;
+
+  @override
+  Widget build(BuildContext context) {
+    if (guests.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Nema gostiju za odabrani filter.'),
+        ),
+      );
+    }
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('#')),
+            DataColumn(label: Text('Gost')),
+            DataColumn(label: Text('Rezervacije')),
+            DataColumn(label: Text('Završeni boravci')),
+            DataColumn(label: Text('Noćenja')),
+            DataColumn(label: Text('Posjećene vikendice')),
+            DataColumn(label: Text('Ukupna potrošnja')),
+          ],
+          rows: guests.asMap().entries.map((entry) {
+            final guest = entry.value;
+            return DataRow(
+              cells: [
+                DataCell(Text('${entry.key + 1}.')),
+                DataCell(
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        guest.guestName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        guest.email,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                DataCell(Text(guest.reservations.toString())),
+                DataCell(Text(guest.completedStays.toString())),
+                DataCell(Text(guest.nights.toString())),
+                DataCell(Text(guest.cabinsVisited.toString())),
+                DataCell(Text('${guest.totalSpent.toStringAsFixed(2)} KM')),
               ],
             );
           }).toList(),

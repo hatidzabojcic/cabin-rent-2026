@@ -1,5 +1,6 @@
 using CabinRent.Infrastructure.Persistence;
 using CabinRent.Infrastructure.Platform;
+using CabinRent.Model.Reports;
 using Xunit;
 
 namespace CabinRent.UnitTests.Reports;
@@ -22,4 +23,28 @@ public sealed class ReportRulesTests
     [Fact]
     public void Nights_are_calculated_from_date_range() =>
         Assert.Equal(4, ReportRules.Nights(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 14)));
+
+    [Fact]
+    public void Guests_are_ranked_by_completed_stays_then_nights()
+    {
+        var guests = new[]
+        {
+            Guest(1, "Prvi gost", completed: 2, nights: 4, spent: 500),
+            Guest(2, "Drugi gost", completed: 2, nights: 7, spent: 400),
+            Guest(3, "Treći gost", completed: 1, nights: 10, spent: 900)
+        };
+
+        Assert.Equal([2, 1, 3], ReportRules.RankGuests(guests, 10).Select(x => x.GuestId));
+    }
+
+    [Fact]
+    public void Guest_ranking_respects_limit()
+    {
+        var guests = new[] { Guest(1, "A", 1, 2, 100), Guest(2, "B", 2, 4, 200) };
+
+        Assert.Single(ReportRules.RankGuests(guests, 1));
+    }
+
+    private static TopGuestDto Guest(int id, string name, int completed, int nights, decimal spent) =>
+        new(id, name, $"guest{id}@test.local", null, completed, completed, nights, completed, spent);
 }

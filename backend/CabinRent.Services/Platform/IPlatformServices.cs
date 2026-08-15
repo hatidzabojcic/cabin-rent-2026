@@ -47,4 +47,5 @@ public interface IFavoriteService
 public interface IReportService
 {
     Task<AnnualReportDto> GetAnnualAsync(int year, int? ownerId, int? cabinId, CancellationToken cancellationToken = default);
+    Task<TopGuestsReportDto> GetTopGuestsAsync(int year, int? cabinId, int limit, CancellationToken cancellationToken = default);
 }
