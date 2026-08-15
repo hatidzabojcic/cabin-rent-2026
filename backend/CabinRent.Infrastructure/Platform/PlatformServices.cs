@@ -173,6 +173,23 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<ReviewDto>> GetManagedAsync(int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default)
+    {
+        if (rating is < 1 or > 5) throw new ArgumentException("Ocjena mora biti između 1 i 5.");
+        var query = dbContext.Reviews.AsNoTracking().AsQueryable();
+        if (ownerId.HasValue) query = query.Where(x => x.Cabin.OwnerId == ownerId);
+        if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
+        if (rating.HasValue) query = query.Where(x => x.Rating == rating.Value);
+        if (approved.HasValue) query = query.Where(x => x.IsApproved == approved.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x => x.Guest.FirstName.Contains(term) || x.Guest.LastName.Contains(term) ||
+                (x.Comment != null && x.Comment.Contains(term)) || x.Cabin.Name.Contains(term));
+        }
+        return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
+    }
+
     public async Task<ReviewDto> CreateAsync(CreateReviewRequest request, int guestId, CancellationToken cancellationToken = default)
     {
         var reservation = await dbContext.Reservations.Include(x => x.Review).SingleOrDefaultAsync(x => x.Id == request.ReservationId, cancellationToken)
@@ -186,9 +203,21 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         return await dbContext.Reviews.AsNoTracking().Where(x => x.Id == review.Id).Select(Projection()).SingleAsync(cancellationToken);
     }
 
+    public async Task<ReviewDto?> SetApprovalAsync(int id, bool isApproved, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var review = await dbContext.Reviews.Include(x => x.Cabin).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (review is null) return null;
+        if (!ReviewModerationRules.CanManage(isAdmin, review.Cabin.OwnerId, actorId))
+            throw new UnauthorizedAccessException("Nemate pristup ovoj recenziji.");
+        review.IsApproved = isApproved;
+        review.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.Reviews.AsNoTracking().Where(x => x.Id == id).Select(Projection()).SingleAsync(cancellationToken);
+    }
+
     private static System.Linq.Expressions.Expression<Func<Review, ReviewDto>> Projection() => x =>
         new ReviewDto(x.Id, x.ReservationId, x.CabinId, x.Cabin.Name, x.GuestId,
-            x.Guest.FirstName + " " + x.Guest.LastName, x.Rating, x.Comment, x.IsApproved, x.CreatedAtUtc);
+            x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Rating, x.Comment, x.IsApproved, x.CreatedAtUtc);
 }
 
 public sealed class FavoriteService(CabinRentDbContext dbContext) : IFavoriteService

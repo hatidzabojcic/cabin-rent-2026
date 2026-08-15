@@ -36,6 +36,12 @@ class DashboardScreen extends StatelessWidget {
                 description:
                     'Pregledajte rezervacije i mijenjajte njihove statuse.',
               ),
+              const _OverviewCard(
+                icon: Icons.rate_review_outlined,
+                title: 'Recenzije',
+                description:
+                    'Pregledajte ocjene gostiju i upravljajte njihovom vidljivošću.',
+              ),
               if (user.isAdmin)
                 const _OverviewCard(
                   icon: Icons.people_outline,

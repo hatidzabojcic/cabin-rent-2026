@@ -4,7 +4,9 @@ namespace CabinRent.Model.Reviews;
 
 public sealed record ReviewDto(
     int Id, int ReservationId, int CabinId, string CabinName, int GuestId,
-    string GuestName, int Rating, string? Comment, bool IsApproved, DateTime CreatedAtUtc);
+    string GuestName, string GuestEmail, int Rating, string? Comment, bool IsApproved, DateTime CreatedAtUtc);
+
+public sealed record UpdateReviewApprovalRequest(bool IsApproved);
 
 public sealed class CreateReviewRequest
 {
