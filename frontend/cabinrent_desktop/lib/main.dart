@@ -7,6 +7,7 @@ import 'core/storage/token_storage.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/cabins/data/cabins_repository.dart';
+import 'features/reservations/data/reservations_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ void main() {
       providers: [
         Provider.value(value: apiClient),
         Provider.value(value: CabinsRepository(apiClient)),
+        Provider.value(value: ReservationsRepository(apiClient)),
         ChangeNotifierProvider(
           create: (_) => AuthController(authRepository)..restoreSession(),
         ),

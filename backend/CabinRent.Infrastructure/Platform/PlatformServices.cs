@@ -61,7 +61,12 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         if (guestId.HasValue) query = query.Where(x => x.GuestId == guestId);
         if (ownerId.HasValue) query = query.Where(x => x.Cabin.OwnerId == ownerId);
         if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ReservationStatus>(status, true, out var parsed)) query = query.Where(x => x.Status == parsed);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<ReservationStatus>(status, true, out var parsed))
+                throw new ArgumentException("Nepoznat status rezervacije.");
+            query = query.Where(x => x.Status == parsed);
+        }
         return await query.OrderByDescending(x => x.CheckIn).Select(Projection()).ToListAsync(cancellationToken);
     }
 
@@ -105,6 +110,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         var reservation = await dbContext.Reservations.Include(x => x.Cabin).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (reservation is null) return null;
         if (!isAdmin && reservation.Cabin.OwnerId != actorId) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
+        if (reservation.Status == status) return await GetByIdAsync(id, cancellationToken);
+        if (!ReservationStatusRules.CanTransition(reservation.Status, status))
+            throw new InvalidOperationException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
         reservation.Status = status;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -113,8 +121,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
     private static System.Linq.Expressions.Expression<Func<Reservation, ReservationDto>> Projection() => x =>
         new ReservationDto(x.Id, x.ConfirmationCode, x.CabinId, x.Cabin.Name, x.Cabin.OwnerId, x.GuestId,
-            x.Guest.FirstName + " " + x.Guest.LastName, x.CheckIn, x.CheckOut, x.Adults, x.Children,
-            x.PricePerNight, x.TotalPrice, x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString());
+            x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,
+            x.CheckIn, x.CheckOut, x.Adults, x.Children, x.PricePerNight, x.TotalPrice,
+            x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(), x.CreatedAtUtc);
 }
 
 public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService

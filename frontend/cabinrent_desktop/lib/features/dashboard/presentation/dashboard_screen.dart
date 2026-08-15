@@ -33,7 +33,8 @@ class DashboardScreen extends StatelessWidget {
               _OverviewCard(
                 icon: Icons.calendar_month_outlined,
                 title: 'Rezervacije',
-                description: 'Upravljanje rezervacijama je sljedeći modul.',
+                description:
+                    'Pregledajte rezervacije i mijenjajte njihove statuse.',
               ),
               _OverviewCard(
                 icon: Icons.people_outline,
