@@ -5,6 +5,7 @@ using CabinRent.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using CabinRent.API.Infrastructure;
 
 namespace CabinRent.API.Controllers;
 
@@ -51,6 +52,19 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         var user = await authService.GetCurrentUserAsync(userId, cancellationToken);
         return user is null ? NotFound() : Ok(user);
     }
+
+    [Authorize]
+    [HttpPut("me")]
+    public async Task<ActionResult<UserDto>> UpdateMe(UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var user = await authService.UpdateProfileAsync(User.GetUserId(), request, cancellationToken);
+        return user is null ? NotFound() : Ok(user);
+    }
+
+    [Authorize(Roles = "Guest")]
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeactivateMe(CancellationToken cancellationToken) =>
+        await authService.DeactivateProfileAsync(User.GetUserId(), ClientIp(), cancellationToken) ? NoContent() : NotFound();
 
     private string? ClientIp() => HttpContext.Connection.RemoteIpAddress?.ToString();
 }

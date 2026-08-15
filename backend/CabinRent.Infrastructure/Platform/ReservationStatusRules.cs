@@ -24,4 +24,7 @@ public static class ReservationStatusRules
                 [ReservationStatus.Completed, ReservationStatus.Cancelled],
             _ => []
         };
+
+    public static bool CanGuestCancel(ReservationStatus status, DateOnly checkIn, DateOnly today) =>
+        status is ReservationStatus.Pending or ReservationStatus.Confirmed && checkIn > today;
 }

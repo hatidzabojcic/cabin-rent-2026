@@ -94,6 +94,44 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         return user is null ? null : ToDto(user);
     }
 
+    public async Task<UserDto?> UpdateProfileAsync(int userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            throw new ArgumentException("Ime i prezime su obavezni.");
+        var user = await UserQuery().SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
+        if (user is null) return null;
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        if (await dbContext.Users.AnyAsync(x => x.Id != userId && x.Email == email, cancellationToken))
+            throw new InvalidOperationException("Email adresa je već registrovana.");
+
+        user.FirstName = request.FirstName.Trim();
+        user.LastName = request.LastName.Trim();
+        user.Email = email;
+        user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToDto(user);
+    }
+
+    public async Task<bool> DeactivateProfileAsync(int userId, string? ipAddress, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.Include(x => x.RefreshTokens)
+            .SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
+        if (user is null) return false;
+
+        var now = DateTime.UtcNow;
+        user.IsActive = false;
+        user.UpdatedAtUtc = now;
+        foreach (var token in user.RefreshTokens.Where(x => x.RevokedAtUtc == null))
+        {
+            token.RevokedAtUtc = now;
+            token.RevokedByIp = ipAddress;
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private async Task<AuthResponse> CreateSessionAsync(User user, string? ipAddress, CancellationToken cancellationToken)
     {
         var rawRefreshToken = GenerateRefreshToken();

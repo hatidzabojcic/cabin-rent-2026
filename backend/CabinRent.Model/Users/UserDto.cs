@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace CabinRent.Model.Users;
 
 public sealed record UserDto(
@@ -10,3 +12,11 @@ public sealed record ManagedUserDto(
     int CabinCount, int ReservationCount);
 
 public sealed record UpdateUserStatusRequest(bool IsActive);
+
+public sealed class UpdateProfileRequest
+{
+    [Required, MaxLength(100)] public required string FirstName { get; init; }
+    [Required, MaxLength(100)] public required string LastName { get; init; }
+    [Required, EmailAddress, MaxLength(320)] public required string Email { get; init; }
+    [MaxLength(50)] public string? PhoneNumber { get; init; }
+}

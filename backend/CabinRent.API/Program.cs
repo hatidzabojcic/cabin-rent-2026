@@ -10,6 +10,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +53,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ClockSkew = TimeSpan.FromSeconds(30),
         NameClaimType = "unique_name",
         RoleClaimType = ClaimTypes.Role
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var subject = context.Principal?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!int.TryParse(subject, out var userId))
+            {
+                context.Fail("Token ne sadrži validan identitet korisnika.");
+                return;
+            }
+
+            var dbContext = context.HttpContext.RequestServices.GetRequiredService<CabinRentDbContext>();
+            if (!await dbContext.Users.AnyAsync(x => x.Id == userId && x.IsActive, context.HttpContext.RequestAborted))
+                context.Fail("Korisnički račun nije aktivan.");
+        }
     };
 });
 builder.Services.AddAuthorization();

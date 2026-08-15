@@ -166,6 +166,24 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
         return await GetByIdAsync(id, cancellationToken);
     }
 
+    public async Task<ReservationDto?> CancelAsync(int id, int guestId, CancellationToken cancellationToken = default)
+    {
+        var reservation = await dbContext.Reservations.Include(x => x.Cabin)
+            .SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
+        if (reservation is null) return null;
+        if (!ReservationStatusRules.CanGuestCancel(reservation.Status, reservation.CheckIn, DateOnly.FromDateTime(DateTime.UtcNow)))
+            throw new InvalidOperationException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
+
+        reservation.Status = ReservationStatus.Cancelled;
+        reservation.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await notificationPublisher.PublishAsync(new NotificationEvent(
+            Guid.NewGuid(), reservation.Cabin.OwnerId, "ReservationCancelled", "Otkazana rezervacija",
+            $"Gost je otkazao rezervaciju {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name}.",
+            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+        return await GetByIdAsync(id, cancellationToken);
+    }
+
     private static System.Linq.Expressions.Expression<Func<Reservation, ReservationDto>> Projection() => x =>
         new ReservationDto(x.Id, x.ConfirmationCode, x.CabinId, x.Cabin.Name, x.Cabin.OwnerId, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,
