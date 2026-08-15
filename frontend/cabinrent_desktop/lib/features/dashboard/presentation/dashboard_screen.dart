@@ -42,6 +42,11 @@ class DashboardScreen extends StatelessWidget {
                 description:
                     'Pregledajte ocjene gostiju i upravljajte njihovom vidljivošću.',
               ),
+              const _OverviewCard(
+                icon: Icons.bar_chart_outlined,
+                title: 'Izvještaji',
+                description: 'Pratite godišnju posjećenost i ostvareni prihod.',
+              ),
               if (user.isAdmin)
                 const _OverviewCard(
                   icon: Icons.people_outline,

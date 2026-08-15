@@ -3,6 +3,7 @@ using CabinRent.Model.Favorites;
 using CabinRent.Model.Reservations;
 using CabinRent.Model.Reviews;
 using CabinRent.Model.Users;
+using CabinRent.Model.Reports;
 
 namespace CabinRent.Services.Platform;
 
@@ -40,4 +41,9 @@ public interface IFavoriteService
     Task<IReadOnlyCollection<FavoriteDto>> GetAsync(int userId, CancellationToken cancellationToken = default);
     Task<FavoriteDto> AddAsync(AddFavoriteRequest request, int userId, CancellationToken cancellationToken = default);
     Task<bool> RemoveAsync(int userId, int cabinId, CancellationToken cancellationToken = default);
+}
+
+public interface IReportService
+{
+    Task<AnnualReportDto> GetAnnualAsync(int year, int? ownerId, int? cabinId, CancellationToken cancellationToken = default);
 }

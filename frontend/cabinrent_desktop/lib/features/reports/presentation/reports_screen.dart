@@ -1,0 +1,406 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../cabins/data/cabins_repository.dart';
+import '../../cabins/domain/cabin.dart';
+import '../data/reports_repository.dart';
+import '../domain/annual_report.dart';
+
+class ReportsScreen extends StatefulWidget {
+  const ReportsScreen({super.key});
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  AnnualReport? _report;
+  List<Cabin> _cabins = [];
+  bool _loading = true;
+  String? _error;
+  int _year = DateTime.now().year;
+  int? _cabinId;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        context.read<ReportsRepository>().getAnnualReport(
+          _year,
+          cabinId: _cabinId,
+        ),
+        context.read<CabinsRepository>().getManagedCabins(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _report = results[0] as AnnualReport;
+        _cabins = results[1] as List<Cabin>;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final years = List.generate(7, (index) => DateTime.now().year + 1 - index);
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Izvještaji',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Godišnja posjećenost, ostvareni prihod i rang-lista vikendica.',
+                    ),
+                  ],
+                ),
+              ),
+              IconButton.filledTonal(
+                onPressed: _loading ? null : _load,
+                tooltip: 'Osvježi',
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Wrap(
+            spacing: 14,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<int>(
+                  initialValue: _year,
+                  decoration: const InputDecoration(labelText: 'Godina'),
+                  items: years
+                      .map(
+                        (year) => DropdownMenuItem(
+                          value: year,
+                          child: Text(year.toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      _year = value;
+                      _load();
+                    }
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 270,
+                child: DropdownButtonFormField<int?>(
+                  initialValue: _cabinId,
+                  decoration: const InputDecoration(labelText: 'Vikendica'),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Sve vikendice'),
+                    ),
+                    ..._cabins.map(
+                      (cabin) => DropdownMenuItem<int?>(
+                        value: cabin.id,
+                        child: Text(cabin.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    _cabinId = value;
+                    _load();
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Expanded(child: _content()),
+        ],
+      ),
+    );
+  }
+
+  Widget _content() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Izvještaj nije moguće učitati.\n$_error',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Pokušaj ponovo'),
+            ),
+          ],
+        ),
+      );
+    }
+    final report = _report!;
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _MetricCard(
+                icon: Icons.event_available,
+                label: 'Rezervacije',
+                value: report.totalReservations.toString(),
+                hint: 'Potvrđene i završene',
+              ),
+              _MetricCard(
+                icon: Icons.task_alt,
+                label: 'Završeni boravci',
+                value: report.completedStays.toString(),
+                hint: 'Realizovane rezervacije',
+              ),
+              _MetricCard(
+                icon: Icons.bedtime_outlined,
+                label: 'Noćenja',
+                value: report.totalNights.toString(),
+                hint: '${report.totalGuests} gostiju',
+              ),
+              _MetricCard(
+                icon: Icons.payments_outlined,
+                label: 'Ostvareni prihod',
+                value: '${report.revenue.toStringAsFixed(2)} KM',
+                hint: 'Samo završeni boravci',
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _MonthlyChart(months: report.months),
+          const SizedBox(height: 22),
+          Text(
+            'Posjećenost po vikendici – ${report.year}.',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          _CabinRanking(cabins: report.cabins),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.hint,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final String hint;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 225,
+    height: 130,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(17),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              hint,
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _MonthlyChart extends StatelessWidget {
+  const _MonthlyChart({required this.months});
+  final List<MonthlyReport> months;
+  @override
+  Widget build(BuildContext context) {
+    final maxNights = months.fold<int>(
+      0,
+      (max, item) => item.nights > max ? item.nights : max,
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Noćenja po mjesecima',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 18),
+            ...months.map(
+              (month) => Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 38,
+                      child: Text(monthLabels[month.month - 1]),
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final ratio = maxNights == 0
+                              ? 0.0
+                              : month.nights / maxNights;
+                          return Stack(
+                            children: [
+                              Container(
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: .05),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                width: constraints.maxWidth * ratio,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: .75),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: 70,
+                      child: Text(
+                        '${month.nights} noći',
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CabinRanking extends StatelessWidget {
+  const _CabinRanking({required this.cabins});
+  final List<CabinAnnualReport> cabins;
+  @override
+  Widget build(BuildContext context) {
+    if (cabins.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Nema vikendica za odabrani filter.'),
+        ),
+      );
+    }
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('#')),
+            DataColumn(label: Text('Vikendica')),
+            DataColumn(label: Text('Vlasnik')),
+            DataColumn(label: Text('Rezervacije')),
+            DataColumn(label: Text('Završene')),
+            DataColumn(label: Text('Noćenja')),
+            DataColumn(label: Text('Gosti')),
+            DataColumn(label: Text('Prihod')),
+          ],
+          rows: cabins.asMap().entries.map((entry) {
+            final cabin = entry.value;
+            return DataRow(
+              cells: [
+                DataCell(Text('${entry.key + 1}.')),
+                DataCell(
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cabin.cabinName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        cabin.city,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                DataCell(Text(cabin.ownerName)),
+                DataCell(Text(cabin.reservations.toString())),
+                DataCell(Text(cabin.completedStays.toString())),
+                DataCell(Text(cabin.nights.toString())),
+                DataCell(Text(cabin.guests.toString())),
+                DataCell(Text('${cabin.revenue.toStringAsFixed(2)} KM')),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}

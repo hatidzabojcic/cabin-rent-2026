@@ -9,6 +9,7 @@ import 'features/auth/presentation/auth_controller.dart';
 import 'features/cabins/data/cabins_repository.dart';
 import 'features/reservations/data/reservations_repository.dart';
 import 'features/reviews/data/reviews_repository.dart';
+import 'features/reports/data/reports_repository.dart';
 import 'features/users/data/users_repository.dart';
 
 void main() {
@@ -25,6 +26,7 @@ void main() {
         Provider.value(value: CabinsRepository(apiClient)),
         Provider.value(value: ReservationsRepository(apiClient)),
         Provider.value(value: ReviewsRepository(apiClient)),
+        Provider.value(value: ReportsRepository(apiClient)),
         Provider.value(value: UsersRepository(apiClient)),
         ChangeNotifierProvider(
           create: (_) => AuthController(authRepository)..restoreSession(),

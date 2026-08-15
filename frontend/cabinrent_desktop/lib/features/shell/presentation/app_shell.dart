@@ -7,6 +7,7 @@ import '../../cabins/presentation/cabins_screen.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 import '../../reviews/presentation/reviews_screen.dart';
+import '../../reports/presentation/reports_screen.dart';
 import '../../users/presentation/users_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -43,6 +44,11 @@ class _AppShellState extends State<AppShell> {
         selectedIcon: Icon(Icons.rate_review),
         label: Text('Recenzije'),
       ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.bar_chart_outlined),
+        selectedIcon: Icon(Icons.bar_chart),
+        label: Text('Izvještaji'),
+      ),
       if (user.isAdmin)
         const NavigationRailDestination(
           icon: Icon(Icons.people_outline),
@@ -55,6 +61,7 @@ class _AppShellState extends State<AppShell> {
       const CabinsScreen(),
       const ReservationsScreen(),
       const ReviewsScreen(),
+      const ReportsScreen(),
       if (user.isAdmin) const UsersScreen(),
     ];
 

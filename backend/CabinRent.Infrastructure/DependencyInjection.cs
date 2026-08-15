@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IFavoriteService, FavoriteService>();
+        services.AddScoped<IReportService, ReportService>();
         return services;
     }
 }
