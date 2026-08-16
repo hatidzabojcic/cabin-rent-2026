@@ -4,6 +4,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../cabins/presentation/cabins_screen.dart';
 import '../../notifications/presentation/notifications_controller.dart';
 import '../../notifications/presentation/notifications_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 import '../../reservations/presentation/reservations_controller.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 
@@ -45,7 +46,7 @@ class _HomeShellState extends State<HomeShell> {
       CabinsScreen(onReservationCreated: _showReservations),
       const ReservationsScreen(),
       NotificationsScreen(onOpenReservations: _showReservations),
-      const _ProfilePage(),
+      const ProfileScreen(),
     ];
     return Scaffold(
       body: SafeArea(
@@ -143,74 +144,6 @@ class _WelcomePage extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProfilePage extends StatelessWidget {
-  const _ProfilePage();
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthController>(), user = auth.user!;
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 12),
-        Text(
-          'Moj profil',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 34,
-                  child: Text(
-                    user.firstName.substring(0, 1).toUpperCase(),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  user.fullName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                Text('@${user.userName}'),
-                const Divider(height: 32),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.email_outlined),
-                  title: const Text('Email'),
-                  subtitle: Text(user.email),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_outlined),
-                  title: const Text('Telefon'),
-                  subtitle: Text(
-                    user.phoneNumber?.isNotEmpty == true
-                        ? user.phoneNumber!
-                        : 'Nije unesen',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        OutlinedButton.icon(
-          onPressed: auth.isLoading ? null : auth.logout,
-          icon: const Icon(Icons.logout),
-          label: const Text('Odjavi se'),
         ),
       ],
     );

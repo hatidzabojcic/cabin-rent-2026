@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'auth_controller.dart';
 
@@ -41,6 +42,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'Ovo polje je obavezno.' : null;
+
+  String? _validateEmail(String? value) {
+    final required = _required(value);
+    if (required != null) return required;
+    final format = RegExp(
+      r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.[A-Za-z]{2,24}$",
+    );
+    return format.hasMatch(value!.trim())
+        ? null
+        : 'Unesite ispravnu email adresu.';
+  }
+
+  String? _validatePhone(String? value) {
+    final phone = (value ?? '').replaceAll(' ', '');
+    if (phone.isEmpty) return null;
+    return RegExp(r'^\+3876[0-7][0-9]{6}$').hasMatch(phone)
+        ? null
+        : 'Unesite BiH mobilni broj, npr. +387 61 123 456.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
@@ -95,13 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (v) {
-                    final required = _required(v);
-                    if (required != null) return required;
-                    return v!.contains('@')
-                        ? null
-                        : 'Unesite ispravnu email adresu.';
-                  },
+                  validator: _validateEmail,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -122,10 +137,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _phone,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
+                  maxLength: 15,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Telefon (opcionalno)',
+                    hintText: '+387 61 123 456',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
+                  validator: _validatePhone,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

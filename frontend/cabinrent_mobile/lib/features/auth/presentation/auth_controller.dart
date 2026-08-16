@@ -87,4 +87,41 @@ class AuthController extends ChangeNotifier {
     status = AuthStatus.unauthenticated;
     notifyListeners();
   }
+
+  Future<bool> updateProfile({
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? phoneNumber,
+  }) async {
+    final session = _session;
+    if (session == null) return false;
+    status = AuthStatus.loading;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final updatedUser = await _repository.updateProfile(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phoneNumber: phoneNumber,
+      );
+      _session = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: updatedUser,
+      );
+      status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+    } catch (_) {
+      errorMessage = 'Profil trenutno nije moguće ažurirati.';
+    }
+    status = AuthStatus.authenticated;
+    notifyListeners();
+    return false;
+  }
 }

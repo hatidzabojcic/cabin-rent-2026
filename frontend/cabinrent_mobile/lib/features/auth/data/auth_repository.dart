@@ -1,5 +1,6 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/storage/session_storage.dart';
+import '../domain/app_user.dart';
 import '../domain/auth_session.dart';
 
 class AuthRepository {
@@ -34,7 +35,9 @@ class AuthRepository {
           'email': email,
           'userName': userName,
           'password': password,
-          'phoneNumber': phoneNumber,
+          'phoneNumber': phoneNumber?.trim().isEmpty == true
+              ? null
+              : phoneNumber?.replaceAll(' ', ''),
         },
       ),
     ),
@@ -72,6 +75,26 @@ class AuthRepository {
       await _storage.clear();
     }
   }
+
+  Future<AppUser> updateProfile({
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? phoneNumber,
+  }) async => AppUser.fromJson(
+    await _api.put(
+      '/api/auth/me',
+      authenticated: true,
+      body: {
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim(),
+        'phoneNumber': phoneNumber?.trim().isEmpty == true
+            ? null
+            : phoneNumber?.replaceAll(' ', ''),
+      },
+    ),
+  );
 
   Future<AuthSession> _save(AuthSession session) async {
     _api.accessToken = session.accessToken;
