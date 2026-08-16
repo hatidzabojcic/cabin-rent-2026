@@ -1,0 +1,38 @@
+import 'package:cabinrent_mobile/features/cabins/domain/cabin_details.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('parses cabin details with gallery and amenities', () {
+    final cabin = CabinDetails.fromJson({
+      'id': 2,
+      'name': 'Neretva retreat',
+      'description': 'Kuća za odmor uz rijeku.',
+      'address': 'Glavatičevo bb',
+      'areaSquareMeters': 95,
+      'pricePerNight': 220.0,
+      'maxAdults': 6,
+      'maxChildren': 3,
+      'bedrooms': 3,
+      'bathrooms': 2,
+      'ownerName': 'Demo Owner',
+      'city': 'Konjic',
+      'cabinType': 'Kuća uz jezero',
+      'images': [
+        {
+          'id': 10,
+          'url': '/uploads/cabins/neretva.jpg',
+          'altText': 'Dnevni boravak',
+          'sortOrder': 0,
+          'isCover': true,
+        },
+      ],
+      'amenities': [
+        {'id': 1, 'name': 'Wi-Fi', 'icon': 'wifi'},
+      ],
+    });
+
+    expect(cabin.maxGuests, 9);
+    expect(cabin.images.single.isCover, isTrue);
+    expect(cabin.amenities.single.name, 'Wi-Fi');
+  });
+}

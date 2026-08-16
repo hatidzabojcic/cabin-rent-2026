@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/cabin_summary.dart';
+import 'cabin_details_screen.dart';
 import 'cabins_controller.dart';
 
 class CabinsScreen extends StatefulWidget {
@@ -106,64 +107,70 @@ class _CabinCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     clipBehavior: Clip.antiAlias,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 170,
-          width: double.infinity,
-          child: cabin.resolvedImageUrl == null
-              ? const ColoredBox(
-                  color: Color(0xFFE3EBE7),
-                  child: Icon(Icons.cabin_outlined, size: 54),
-                )
-              : Image.network(
-                  cabin.resolvedImageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const ColoredBox(
-                    color: Color(0xFFE3EBE7),
-                    child: Icon(Icons.broken_image_outlined, size: 42),
-                  ),
-                ),
+    child: InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CabinDetailsScreen(summary: cabin),
         ),
-        Padding(
-          padding: const EdgeInsets.all(17),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      cabin.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 170,
+            width: double.infinity,
+            child: cabin.resolvedImageUrl == null
+                ? const ColoredBox(
+                    color: Color(0xFFE3EBE7),
+                    child: Icon(Icons.cabin_outlined, size: 54),
+                  )
+                : Image.network(
+                    cabin.resolvedImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const ColoredBox(
+                      color: Color(0xFFE3EBE7),
+                      child: Icon(Icons.broken_image_outlined, size: 42),
+                    ),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(17),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cabin.name,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  if (cabin.averageRating != null)
-                    Row(
-                      children: [
-                        const Icon(Icons.star, size: 18, color: Colors.amber),
-                        Text(cabin.averageRating!.toStringAsFixed(1)),
-                      ],
-                    ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              Text('${cabin.city}  •  do ${cabin.maxGuests} gostiju'),
-              const SizedBox(height: 12),
-              Text(
-                '${cabin.pricePerNight.toStringAsFixed(2)} KM / noć',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w800,
+                    if (cabin.averageRating != null) ...[
+                      const Icon(Icons.star, size: 18, color: Colors.amber),
+                      Text(cabin.averageRating!.toStringAsFixed(1)),
+                    ],
+                    const SizedBox(width: 5),
+                    const Icon(Icons.chevron_right),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 7),
+                Text('${cabin.city}  •  do ${cabin.maxGuests} gostiju'),
+                const SizedBox(height: 12),
+                Text(
+                  '${cabin.pricePerNight.toStringAsFixed(2)} KM / noć',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

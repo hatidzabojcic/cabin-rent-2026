@@ -1,4 +1,5 @@
 import '../../../core/api/api_client.dart';
+import '../domain/cabin_details.dart';
 import '../domain/cabin_summary.dart';
 
 class CabinsRepository {
@@ -15,5 +16,10 @@ class CabinsRepository {
     return (result['items'] as List<dynamic>)
         .map((x) => CabinSummary.fromJson(x as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<CabinDetails> getCabin(int id) async {
+    final result = await _api.getObject('/api/cabins/$id');
+    return CabinDetails.fromJson(result);
   }
 }

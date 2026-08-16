@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../data/cabins_repository.dart';
+import '../domain/cabin_details.dart';
 import '../domain/cabin_summary.dart';
 
 class CabinsController extends ChangeNotifier {
@@ -22,4 +23,6 @@ class CabinsController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<CabinDetails> getCabin(int id) => _repository.getCabin(id);
 }
