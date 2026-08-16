@@ -8,6 +8,8 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/cabins/data/cabins_repository.dart';
 import 'features/cabins/presentation/cabins_controller.dart';
+import 'features/notifications/data/notifications_repository.dart';
+import 'features/notifications/presentation/notifications_controller.dart';
 import 'features/reservations/data/reservations_repository.dart';
 import 'features/reservations/presentation/reservations_controller.dart';
 
@@ -27,6 +29,9 @@ void main() {
         ),
         ChangeNotifierProvider(
           create: (_) => ReservationsController(ReservationsRepository(api)),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => NotificationsController(NotificationsRepository(api)),
         ),
       ],
       child: const CabinRentMobileApp(),

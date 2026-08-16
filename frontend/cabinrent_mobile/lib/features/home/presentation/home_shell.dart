@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cabins/presentation/cabins_screen.dart';
+import '../../notifications/presentation/notifications_controller.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../reservations/presentation/reservations_controller.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 
@@ -13,6 +15,22 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  late final NotificationsController _notificationsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationsController = context.read<NotificationsController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notificationsController.start();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationsController.stop();
+    super.dispose();
+  }
 
   void _showReservations() {
     context.read<ReservationsController>().load();
@@ -21,10 +39,12 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationsController>().unreadCount;
     final pages = [
       const _WelcomePage(),
       CabinsScreen(onReservationCreated: _showReservations),
       const ReservationsScreen(),
+      NotificationsScreen(onOpenReservations: _showReservations),
       const _ProfilePage(),
     ];
     return Scaffold(
@@ -34,23 +54,28 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Početna',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.cabin_outlined),
             selectedIcon: Icon(Icons.cabin),
             label: 'Vikendice',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Rezervacije',
           ),
           NavigationDestination(
+            icon: _NotificationIcon(count: unreadCount),
+            selectedIcon: _NotificationIcon(count: unreadCount, selected: true),
+            label: 'Obavijesti',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profil',
@@ -59,6 +84,20 @@ class _HomeShellState extends State<HomeShell> {
       ),
     );
   }
+}
+
+class _NotificationIcon extends StatelessWidget {
+  const _NotificationIcon({required this.count, this.selected = false});
+
+  final int count;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Badge(
+    isLabelVisible: count > 0,
+    label: Text(count > 99 ? '99+' : count.toString()),
+    child: Icon(selected ? Icons.notifications : Icons.notifications_outlined),
+  );
 }
 
 class _WelcomePage extends StatelessWidget {
