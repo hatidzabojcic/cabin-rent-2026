@@ -1,4 +1,5 @@
 import 'package:cabinrent_mobile/features/cabins/domain/cabin_details.dart';
+import 'package:cabinrent_mobile/features/cabins/domain/cabin_search_criteria.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -34,5 +35,16 @@ void main() {
     expect(cabin.maxGuests, 9);
     expect(cabin.images.single.isCover, isTrue);
     expect(cabin.amenities.single.name, 'Wi-Fi');
+  });
+
+  test('calculates the number of nights for availability criteria', () {
+    final criteria = CabinSearchCriteria(
+      checkIn: DateTime(2026, 9, 10),
+      checkOut: DateTime(2026, 9, 14),
+      guests: 4,
+    );
+
+    expect(criteria.nights, 4);
+    expect(criteria.guests, 4);
   });
 }

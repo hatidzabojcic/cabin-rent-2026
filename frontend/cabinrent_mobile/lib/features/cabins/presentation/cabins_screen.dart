@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
 import 'cabin_details_screen.dart';
 import 'cabins_controller.dart';
@@ -14,6 +15,10 @@ class CabinsScreen extends StatefulWidget {
 class _CabinsScreenState extends State<CabinsScreen> {
   final _search = TextEditingController();
   Timer? _timer;
+  DateTimeRange? _selectedRange;
+  int _guests = 2;
+  bool _initializedFilters = false;
+
   @override
   void initState() {
     super.initState();
@@ -21,6 +26,21 @@ class _CabinsScreenState extends State<CabinsScreen> {
       final c = context.read<CabinsController>();
       if (!c.hasLoaded) c.load();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedFilters) return;
+    final criteria = context.read<CabinsController>().criteria;
+    if (criteria != null) {
+      _selectedRange = DateTimeRange(
+        start: criteria.checkIn,
+        end: criteria.checkOut,
+      );
+      _guests = criteria.guests;
+    }
+    _initializedFilters = true;
   }
 
   @override
@@ -36,6 +56,56 @@ class _CabinsScreenState extends State<CabinsScreen> {
       const Duration(milliseconds: 450),
       () => context.read<CabinsController>().load(search: value),
     );
+  }
+
+  Future<void> _selectDates() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final tomorrow = today.add(const Duration(days: 1));
+    final initialRange =
+        _selectedRange != null && !_selectedRange!.start.isBefore(today)
+        ? _selectedRange
+        : DateTimeRange(
+            start: tomorrow,
+            end: tomorrow.add(const Duration(days: 2)),
+          );
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 730)),
+      initialDateRange: initialRange,
+      helpText: 'Odaberite termin boravka',
+      cancelText: 'Odustani',
+      confirmText: 'Potvrdi',
+      saveText: 'Sačuvaj',
+    );
+    if (range != null && mounted) setState(() => _selectedRange = range);
+  }
+
+  Future<void> _applyAvailability() async {
+    final range = _selectedRange;
+    if (range == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Prvo odaberite datum dolaska i odlaska.'),
+        ),
+      );
+      return;
+    }
+    await context.read<CabinsController>().applyAvailability(
+      CabinSearchCriteria(
+        checkIn: range.start,
+        checkOut: range.end,
+        guests: _guests,
+      ),
+    );
+  }
+
+  Future<void> _clearAvailability() async {
+    setState(() {
+      _selectedRange = null;
+      _guests = 2;
+    });
+    await context.read<CabinsController>().clearAvailability();
   }
 
   @override
@@ -66,6 +136,17 @@ class _CabinsScreenState extends State<CabinsScreen> {
                     prefixIcon: Icon(Icons.search),
                   ),
                 ),
+                const SizedBox(height: 14),
+                _AvailabilitySearch(
+                  selectedRange: _selectedRange,
+                  guests: _guests,
+                  isApplied: controller.criteria != null,
+                  isLoading: controller.isLoading,
+                  onSelectDates: _selectDates,
+                  onGuestsChanged: (value) => setState(() => _guests = value),
+                  onApply: _applyAvailability,
+                  onClear: _clearAvailability,
+                ),
               ]),
             ),
           ),
@@ -91,7 +172,10 @@ class _CabinsScreenState extends State<CabinsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               sliver: SliverList.separated(
                 itemCount: controller.cabins.length,
-                itemBuilder: (_, i) => _CabinCard(cabin: controller.cabins[i]),
+                itemBuilder: (_, i) => _CabinCard(
+                  cabin: controller.cabins[i],
+                  criteria: controller.criteria,
+                ),
                 separatorBuilder: (_, _) => const SizedBox(height: 14),
               ),
             ),
@@ -102,15 +186,17 @@ class _CabinsScreenState extends State<CabinsScreen> {
 }
 
 class _CabinCard extends StatelessWidget {
-  const _CabinCard({required this.cabin});
+  const _CabinCard({required this.cabin, this.criteria});
   final CabinSummary cabin;
+  final CabinSearchCriteria? criteria;
   @override
   Widget build(BuildContext context) => Card(
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => CabinDetailsScreen(summary: cabin),
+          builder: (_) =>
+              CabinDetailsScreen(summary: cabin, searchCriteria: criteria),
         ),
       ),
       child: Column(
@@ -168,6 +254,135 @@ class _CabinCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AvailabilitySearch extends StatelessWidget {
+  const _AvailabilitySearch({
+    required this.selectedRange,
+    required this.guests,
+    required this.isApplied,
+    required this.isLoading,
+    required this.onSelectDates,
+    required this.onGuestsChanged,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  final DateTimeRange? selectedRange;
+  final int guests;
+  final bool isApplied;
+  final bool isLoading;
+  final VoidCallback onSelectDates;
+  final ValueChanged<int> onGuestsChanged;
+  final VoidCallback onApply;
+  final VoidCallback onClear;
+
+  String _date(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}.'
+      '${value.month.toString().padLeft(2, '0')}.${value.year}.';
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_available_outlined),
+              const SizedBox(width: 8),
+              Text(
+                'Provjeri dostupnost',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          InkWell(
+            onTap: isLoading ? null : onSelectDates,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Dolazak i odlazak',
+                prefixIcon: Icon(Icons.date_range_outlined),
+              ),
+              child: Text(
+                selectedRange == null
+                    ? 'Odaberite termin'
+                    : '${_date(selectedRange!.start)} – ${_date(selectedRange!.end)}',
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFD7DDD8)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.people_outline),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Broj gostiju')),
+                IconButton(
+                  onPressed: isLoading || guests <= 1
+                      ? null
+                      : () => onGuestsChanged(guests - 1),
+                  icon: const Icon(Icons.remove_circle_outline),
+                  tooltip: 'Smanji broj gostiju',
+                ),
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '$guests',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  onPressed: isLoading || guests >= 30
+                      ? null
+                      : () => onGuestsChanged(guests + 1),
+                  icon: const Icon(Icons.add_circle_outline),
+                  tooltip: 'Povećaj broj gostiju',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (isApplied) ...[
+                TextButton(
+                  onPressed: isLoading ? null : onClear,
+                  child: const Text('Poništi'),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: isLoading ? null : onApply,
+                  icon: isLoading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search),
+                  label: const Text('Prikaži slobodne vikendice'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

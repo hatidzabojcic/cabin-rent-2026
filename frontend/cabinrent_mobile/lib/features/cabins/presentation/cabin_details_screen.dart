@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/cabin_details.dart';
+import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
 import 'cabins_controller.dart';
 
 class CabinDetailsScreen extends StatefulWidget {
-  const CabinDetailsScreen({required this.summary, super.key});
+  const CabinDetailsScreen({
+    required this.summary,
+    this.searchCriteria,
+    super.key,
+  });
 
   final CabinSummary summary;
+  final CabinSearchCriteria? searchCriteria;
 
   @override
   State<CabinDetailsScreen> createState() => _CabinDetailsScreenState();
@@ -44,6 +50,7 @@ class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
         return _DetailsContent(
           details: snapshot.data!,
           averageRating: widget.summary.averageRating,
+          searchCriteria: widget.searchCriteria,
         );
       },
     ),
@@ -51,10 +58,15 @@ class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
 }
 
 class _DetailsContent extends StatelessWidget {
-  const _DetailsContent({required this.details, this.averageRating});
+  const _DetailsContent({
+    required this.details,
+    this.averageRating,
+    this.searchCriteria,
+  });
 
   final CabinDetails details;
   final double? averageRating;
+  final CabinSearchCriteria? searchCriteria;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -90,6 +102,10 @@ class _DetailsContent extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             _Price(price: details.pricePerNight),
+            if (searchCriteria != null) ...[
+              const SizedBox(height: 16),
+              _SelectedStay(criteria: searchCriteria!),
+            ],
             const SizedBox(height: 22),
             _Facts(details: details),
             const SizedBox(height: 26),
@@ -129,6 +145,51 @@ class _DetailsContent extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _SelectedStay extends StatelessWidget {
+  const _SelectedStay({required this.criteria});
+
+  final CabinSearchCriteria criteria;
+
+  String _date(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}.'
+      '${value.month.toString().padLeft(2, '0')}.${value.year}.';
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.45),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.event_available_outlined),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Slobodna za odabrani termin',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${_date(criteria.checkIn)} – ${_date(criteria.checkOut)}'
+                '  •  ${criteria.guests} gostiju'
+                '  •  ${criteria.nights} noćenja',
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
 
