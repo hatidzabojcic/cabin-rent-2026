@@ -15,7 +15,10 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
         var query = dbContext.Cabins.AsNoTracking().Where(CabinVisibilityRules.PubliclyVisible);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
-            query = query.Where(x => x.Name.Contains(request.Search) || x.Description.Contains(request.Search));
+            query = query.Where(x =>
+                x.Name.Contains(request.Search) ||
+                x.Description.Contains(request.Search) ||
+                x.City.Name.Contains(request.Search));
         if (request.CityId.HasValue)
             query = query.Where(x => x.CityId == request.CityId);
         if (request.Guests.HasValue)
