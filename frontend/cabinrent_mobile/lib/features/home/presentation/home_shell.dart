@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cabins/presentation/cabins_screen.dart';
+import '../../reservations/presentation/reservations_controller.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -12,11 +13,17 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  void _showReservations() {
+    context.read<ReservationsController>().load();
+    setState(() => _index = 2);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       const _WelcomePage(),
-      const CabinsScreen(),
+      CabinsScreen(onReservationCreated: _showReservations),
       const ReservationsScreen(),
       const _ProfilePage(),
     ];

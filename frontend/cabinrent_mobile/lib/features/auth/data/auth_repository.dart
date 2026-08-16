@@ -3,7 +3,9 @@ import '../../../core/storage/session_storage.dart';
 import '../domain/auth_session.dart';
 
 class AuthRepository {
-  AuthRepository(this._api, this._storage);
+  AuthRepository(this._api, this._storage) {
+    _api.refreshAccessToken = _refreshAccessToken;
+  }
   final ApiClient _api;
   final SessionStorage _storage;
 
@@ -38,6 +40,12 @@ class AuthRepository {
     ),
   );
   Future<AuthSession?> restore() async {
+    return _refreshSession();
+  }
+
+  Future<bool> _refreshAccessToken() async => await _refreshSession() != null;
+
+  Future<AuthSession?> _refreshSession() async {
     final token = await _storage.readRefreshToken();
     if (token == null) return null;
     try {

@@ -7,7 +7,9 @@ import 'cabin_details_screen.dart';
 import 'cabins_controller.dart';
 
 class CabinsScreen extends StatefulWidget {
-  const CabinsScreen({super.key});
+  const CabinsScreen({this.onReservationCreated, super.key});
+
+  final VoidCallback? onReservationCreated;
   @override
   State<CabinsScreen> createState() => _CabinsScreenState();
 }
@@ -175,6 +177,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
                 itemBuilder: (_, i) => _CabinCard(
                   cabin: controller.cabins[i],
                   criteria: controller.criteria,
+                  onReservationCreated: widget.onReservationCreated,
                 ),
                 separatorBuilder: (_, _) => const SizedBox(height: 14),
               ),
@@ -186,17 +189,25 @@ class _CabinsScreenState extends State<CabinsScreen> {
 }
 
 class _CabinCard extends StatelessWidget {
-  const _CabinCard({required this.cabin, this.criteria});
+  const _CabinCard({
+    required this.cabin,
+    this.criteria,
+    this.onReservationCreated,
+  });
   final CabinSummary cabin;
   final CabinSearchCriteria? criteria;
+  final VoidCallback? onReservationCreated;
   @override
   Widget build(BuildContext context) => Card(
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              CabinDetailsScreen(summary: cabin, searchCriteria: criteria),
+          builder: (_) => CabinDetailsScreen(
+            summary: cabin,
+            searchCriteria: criteria,
+            onReservationCreated: onReservationCreated,
+          ),
         ),
       ),
       child: Column(

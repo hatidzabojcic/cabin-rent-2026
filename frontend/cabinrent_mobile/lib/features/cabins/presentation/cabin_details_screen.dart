@@ -4,17 +4,20 @@ import 'package:provider/provider.dart';
 import '../domain/cabin_details.dart';
 import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
+import '../../reservations/presentation/reservation_form_screen.dart';
 import 'cabins_controller.dart';
 
 class CabinDetailsScreen extends StatefulWidget {
   const CabinDetailsScreen({
     required this.summary,
     this.searchCriteria,
+    this.onReservationCreated,
     super.key,
   });
 
   final CabinSummary summary;
   final CabinSearchCriteria? searchCriteria;
+  final VoidCallback? onReservationCreated;
 
   @override
   State<CabinDetailsScreen> createState() => _CabinDetailsScreenState();
@@ -51,6 +54,7 @@ class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
           details: snapshot.data!,
           averageRating: widget.summary.averageRating,
           searchCriteria: widget.searchCriteria,
+          onReservationCreated: widget.onReservationCreated,
         );
       },
     ),
@@ -62,11 +66,13 @@ class _DetailsContent extends StatelessWidget {
     required this.details,
     this.averageRating,
     this.searchCriteria,
+    this.onReservationCreated,
   });
 
   final CabinDetails details;
   final double? averageRating;
   final CabinSearchCriteria? searchCriteria;
+  final VoidCallback? onReservationCreated;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -140,6 +146,20 @@ class _DetailsContent extends StatelessWidget {
               leading: const CircleAvatar(child: Icon(Icons.person_outline)),
               title: Text(details.ownerName),
               subtitle: Text(details.cabinType),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ReservationFormScreen(
+                    cabin: details,
+                    initialCriteria: searchCriteria,
+                    onReservationCreated: onReservationCreated,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.calendar_month_outlined),
+              label: const Text('Rezerviši vikendicu'),
             ),
           ],
         ),
