@@ -15,14 +15,20 @@ void main() {
         jsonEncode({
           'id': 12,
           'confirmationCode': 'CR-TEST-012',
+          'cabinId': 2,
           'cabinName': 'Neretva retreat',
           'checkIn': '2026-09-10',
           'checkOut': '2026-09-14',
           'adults': 2,
           'children': 1,
+          'pricePerNight': 220,
           'totalPrice': 880,
           'status': 'Pending',
           'paymentStatus': 'Pending',
+          'paidAmount': 0,
+          'paymentCurrency': 'BAM',
+          'paidAtUtc': null,
+          'specialRequests': 'Dječiji krevetić',
         }),
         201,
         headers: {'content-type': 'application/json'},
@@ -51,7 +57,12 @@ void main() {
     expect(body['children'], 1);
     expect(body['specialRequests'], 'Dječiji krevetić');
     expect(reservation.confirmationCode, 'CR-TEST-012');
+    expect(reservation.nights, 4);
+    expect(reservation.pricePerNight, 220);
     expect(reservation.totalPrice, 880);
+    expect(reservation.paidAmount, 0);
+    expect(reservation.remainingAmount, 880);
+    expect(reservation.paymentCurrency, 'BAM');
   });
 
   test('refreshes expired access token and retries reservation once', () async {

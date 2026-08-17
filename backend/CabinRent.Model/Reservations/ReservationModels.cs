@@ -6,7 +6,8 @@ public sealed record ReservationDto(
     int Id, string ConfirmationCode, int CabinId, string CabinName, int OwnerId, int GuestId, string GuestName,
     string GuestEmail, string? GuestPhoneNumber,
     DateOnly CheckIn, DateOnly CheckOut, int Adults, int Children, decimal PricePerNight,
-    decimal TotalPrice, string Status, string? SpecialRequests, string? PaymentStatus, DateTime CreatedAtUtc);
+    decimal TotalPrice, string Status, string? SpecialRequests, string? PaymentStatus,
+    decimal PaidAmount, string? PaymentCurrency, DateTime? PaidAtUtc, DateTime CreatedAtUtc);
 
 public sealed class CreateReservationRequest
 {

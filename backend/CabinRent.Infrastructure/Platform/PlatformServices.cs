@@ -190,7 +190,11 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
         new ReservationDto(x.Id, x.ConfirmationCode, x.CabinId, x.Cabin.Name, x.Cabin.OwnerId, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,
             x.CheckIn, x.CheckOut, x.Adults, x.Children, x.PricePerNight, x.TotalPrice,
-            x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(), x.CreatedAtUtc);
+            x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(),
+            x.Payment != null && x.Payment.Status == PaymentStatus.Paid ? x.Payment.Amount : 0,
+            x.Payment == null ? null : x.Payment.Currency,
+            x.Payment == null ? null : x.Payment.PaidAtUtc,
+            x.CreatedAtUtc);
 
     private static string StatusLabel(ReservationStatus status) => status switch
     {
