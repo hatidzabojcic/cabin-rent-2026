@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/reservation.dart';
 import 'reservations_controller.dart';
+import '../../reviews/presentation/review_form_screen.dart';
+import '../../reviews/presentation/reviews_controller.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -167,6 +169,42 @@ class _ReservationCard extends StatelessWidget {
                     }
                   },
                   child: const Text('Otkaži rezervaciju'),
+                ),
+              ),
+            ],
+            if (reservation.canReview) ...[
+              const SizedBox(height: 12),
+              Consumer<ReviewsController>(
+                builder: (context, reviews, _) => Align(
+                  alignment: Alignment.centerRight,
+                  child: reviews.wasSubmitted(reservation.id)
+                      ? const Chip(
+                          avatar: Icon(Icons.hourglass_top, size: 18),
+                          label: Text('Dojam čeka odobrenje'),
+                        )
+                      : FilledButton.tonalIcon(
+                          onPressed: () async {
+                            final submitted = await Navigator.of(context)
+                                .push<bool>(
+                                  MaterialPageRoute<bool>(
+                                    builder: (_) => ReviewFormScreen(
+                                      reservation: reservation,
+                                    ),
+                                  ),
+                                );
+                            if (submitted == true && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Dojam je poslan i čeka odobrenje.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.star_outline),
+                          label: const Text('Ostavi dojam'),
+                        ),
                 ),
               ),
             ],

@@ -29,6 +29,7 @@ class Reservation {
   final double totalPrice;
   final String? paymentStatus;
   bool get canCancel => status == 'Pending' || status == 'Confirmed';
+  bool get canReview => status == 'Completed';
 }
 
 String formatDate(DateTime value) =>
