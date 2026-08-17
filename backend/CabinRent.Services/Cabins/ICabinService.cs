@@ -17,6 +17,7 @@ public interface ICabinService
 public interface IImageStorage
 {
     Task<string> SaveAsync(int cabinId, Stream content, string extension, CancellationToken cancellationToken = default);
+    Task<string> SaveProfileAsync(int userId, Stream content, string extension, CancellationToken cancellationToken = default);
     Task DeleteAsync(string url, CancellationToken cancellationToken = default);
 }
 

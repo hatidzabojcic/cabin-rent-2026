@@ -6,13 +6,14 @@ using CabinRent.Infrastructure.Persistence;
 using CabinRent.Model.Auth;
 using CabinRent.Model.Users;
 using CabinRent.Services.Auth;
+using CabinRent.Services.Cabins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CabinRent.Infrastructure.Auth;
 
-public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOptions> options) : IAuthService
+public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOptions> options, IImageStorage imageStorage) : IAuthService
 {
     private readonly JwtOptions jwt = options.Value;
 
@@ -114,6 +115,29 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         return ToDto(user);
     }
 
+    public async Task<UserDto?> UpdateProfileImageAsync(int userId, Stream content, string extension, CancellationToken cancellationToken = default)
+    {
+        var user = await UserQuery().SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
+        if (user is null) return null;
+
+        var previousImageUrl = user.ProfileImageUrl;
+        var newImageUrl = await imageStorage.SaveProfileAsync(userId, content, extension, cancellationToken);
+        user.ProfileImageUrl = newImageUrl;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            await imageStorage.DeleteAsync(newImageUrl, CancellationToken.None);
+            throw;
+        }
+        if (!string.IsNullOrWhiteSpace(previousImageUrl))
+            await imageStorage.DeleteAsync(previousImageUrl, cancellationToken);
+        return ToDto(user);
+    }
+
     public async Task<bool> DeactivateProfileAsync(int userId, string? ipAddress, CancellationToken cancellationToken = default)
     {
         var user = await dbContext.Users.Include(x => x.RefreshTokens)
@@ -161,7 +185,7 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
     }
 
     private IQueryable<User> UserQuery() => dbContext.Users.Include(x => x.UserRoles).ThenInclude(x => x.Role);
-    private static UserDto ToDto(User user) => new(user.Id, user.FirstName, user.LastName, user.Email, user.UserName, user.PhoneNumber, user.IsActive, user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray());
+    private static UserDto ToDto(User user) => new(user.Id, user.FirstName, user.LastName, user.Email, user.UserName, user.PhoneNumber, user.IsActive, user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray(), user.ProfileImageUrl);
     private static string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

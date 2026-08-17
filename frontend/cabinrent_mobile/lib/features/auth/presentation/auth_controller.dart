@@ -124,4 +124,39 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
     return false;
   }
+
+  Future<bool> updateProfileImage({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    final session = _session;
+    if (session == null) return false;
+    status = AuthStatus.loading;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final updatedUser = await _repository.updateProfileImage(
+        bytes: bytes,
+        fileName: fileName,
+        contentType: contentType,
+      );
+      _session = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: updatedUser,
+      );
+      status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+    } catch (_) {
+      errorMessage = 'Profilnu sliku trenutno nije moguće sačuvati.';
+    }
+    status = AuthStatus.authenticated;
+    notifyListeners();
+    return false;
+  }
 }

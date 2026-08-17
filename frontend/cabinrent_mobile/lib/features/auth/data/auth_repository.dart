@@ -96,6 +96,20 @@ class AuthRepository {
     ),
   );
 
+  Future<AppUser> updateProfileImage({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async => AppUser.fromJson(
+    await _api.postMultipart(
+      '/api/auth/me/image',
+      authenticated: true,
+      bytes: bytes,
+      fileName: fileName,
+      contentType: contentType,
+    ),
+  );
+
   Future<AuthSession> _save(AuthSession session) async {
     _api.accessToken = session.accessToken;
     await _storage.saveRefreshToken(session.refreshToken);

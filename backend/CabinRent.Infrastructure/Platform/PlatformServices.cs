@@ -85,7 +85,7 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
 
     private static System.Linq.Expressions.Expression<Func<User, UserDto>> UserProjection() => x =>
         new UserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
-            x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList());
+            x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.ProfileImageUrl);
 
     private static System.Linq.Expressions.Expression<Func<User, ManagedUserDto>> ManagedUserProjection() => x =>
         new ManagedUserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,

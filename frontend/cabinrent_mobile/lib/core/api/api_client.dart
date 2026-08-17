@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
 import 'api_exception.dart';
 
@@ -69,6 +70,31 @@ class ApiClient {
         body: body == null ? null : jsonEncode(body),
       ),
     ),
+  );
+
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+    bool authenticated = false,
+  }) async => _decode(
+    await _send(authenticated, () async {
+      final request = http.MultipartRequest('POST', _uri(path));
+      request.headers['Accept'] = 'application/json';
+      if (authenticated && accessToken != null) {
+        request.headers['Authorization'] = 'Bearer $accessToken';
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: fileName,
+          contentType: MediaType.parse(contentType),
+        ),
+      );
+      return http.Response.fromStream(await _client.send(request));
+    }),
   );
 
   Future<http.Response> _send(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_controller.dart';
@@ -6,6 +7,54 @@ import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _selectProfileImage(BuildContext context) async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 88,
+    );
+    if (image == null || !context.mounted) return;
+    final bytes = await image.readAsBytes();
+    if (!context.mounted) return;
+    if (bytes.length > 5 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Slika ne smije biti veća od 5 MB.')),
+      );
+      return;
+    }
+    final extension = image.name.split('.').last.toLowerCase();
+    final contentType = switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      _ => null,
+    };
+    if (contentType == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dozvoljeni formati su JPG, PNG i WebP.'),
+          ),
+        );
+      }
+      return;
+    }
+    final saved = await context.read<AuthController>().updateProfileImage(
+      bytes: bytes,
+      fileName: image.name,
+      contentType: contentType,
+    );
+    if (!context.mounted) return;
+    final message = saved
+        ? 'Profilna slika je uspješno sačuvana.'
+        : context.read<AuthController>().errorMessage ??
+              'Profilnu sliku nije moguće sačuvati.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +93,41 @@ class ProfileScreen extends StatelessWidget {
             padding: const EdgeInsets.all(22),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 38,
-                  child: Text(
-                    user.firstName.substring(0, 1).toUpperCase(),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 42,
+                      backgroundImage: user.resolvedProfileImageUrl == null
+                          ? null
+                          : NetworkImage(user.resolvedProfileImageUrl!),
+                      child: user.resolvedProfileImageUrl == null
+                          ? Text(
+                              user.firstName.substring(0, 1).toUpperCase(),
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      right: -8,
+                      bottom: -6,
+                      child: IconButton.filled(
+                        tooltip: 'Promijeni profilnu sliku',
+                        onPressed: auth.isLoading
+                            ? null
+                            : () => _selectProfileImage(context),
+                        icon: const Icon(Icons.photo_camera_outlined, size: 19),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: auth.isLoading
+                      ? null
+                      : () => _selectProfileImage(context),
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('Odaberi profilnu sliku'),
                 ),
                 const SizedBox(height: 14),
                 Text(

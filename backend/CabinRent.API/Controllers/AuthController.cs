@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using CabinRent.API.Infrastructure;
+using CabinRent.Infrastructure.Cabins;
 
 namespace CabinRent.API.Controllers;
 
@@ -58,6 +59,22 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<ActionResult<UserDto>> UpdateMe(UpdateProfileRequest request, CancellationToken cancellationToken)
     {
         var user = await authService.UpdateProfileAsync(User.GetUserId(), request, cancellationToken);
+        return user is null ? NotFound() : Ok(user);
+    }
+
+    [Authorize]
+    [HttpPost("me/image")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    public async Task<ActionResult<UserDto>> UpdateProfileImage(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file.Length == 0) return BadRequest("Odaberite profilnu sliku.");
+        if (file.Length > 5 * 1024 * 1024) return BadRequest("Profilna slika ne smije biti veća od 5 MB.");
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!CabinImageRules.IsSupported(extension, file.ContentType))
+            return BadRequest("Dozvoljeni formati su JPG, PNG i WebP.");
+        await using var stream = file.OpenReadStream();
+        var user = await authService.UpdateProfileImageAsync(User.GetUserId(), stream, extension, cancellationToken);
         return user is null ? NotFound() : Ok(user);
     }
 
