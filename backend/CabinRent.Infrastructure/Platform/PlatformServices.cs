@@ -214,6 +214,13 @@ public sealed class ReviewService(CabinRentDbContext dbContext, INotificationEve
         return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<ReviewDto>> GetMineAsync(int guestId, CancellationToken cancellationToken = default) =>
+        await dbContext.Reviews.AsNoTracking()
+            .Where(x => x.GuestId == guestId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(Projection())
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyCollection<ReviewDto>> GetManagedAsync(int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default)
     {
         if (rating is < 1 or > 5) throw new ArgumentException("Ocjena mora biti između 1 i 5.");

@@ -18,14 +18,19 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final c = context.read<ReservationsController>();
       if (!c.hasLoaded) c.load();
+      final reviews = context.read<ReviewsController>();
+      if (!reviews.hasLoadedMine) reviews.loadMine();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.watch<ReservationsController>();
+    final reviews = context.read<ReviewsController>();
     return RefreshIndicator(
-      onRefresh: c.load,
+      onRefresh: () async {
+        await Future.wait([c.load(), reviews.loadMine()]);
+      },
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -178,9 +183,22 @@ class _ReservationCard extends StatelessWidget {
                 builder: (context, reviews, _) => Align(
                   alignment: Alignment.centerRight,
                   child: reviews.wasSubmitted(reservation.id)
-                      ? const Chip(
-                          avatar: Icon(Icons.hourglass_top, size: 18),
-                          label: Text('Dojam čeka odobrenje'),
+                      ? Chip(
+                          avatar: Icon(
+                            reviews
+                                    .reviewForReservation(reservation.id)!
+                                    .isApproved
+                                ? Icons.check_circle_outline
+                                : Icons.hourglass_top,
+                            size: 18,
+                          ),
+                          label: Text(
+                            reviews
+                                    .reviewForReservation(reservation.id)!
+                                    .isApproved
+                                ? 'Dojam je objavljen'
+                                : 'Dojam čeka odobrenje',
+                          ),
                         )
                       : FilledButton.tonalIcon(
                           onPressed: () async {

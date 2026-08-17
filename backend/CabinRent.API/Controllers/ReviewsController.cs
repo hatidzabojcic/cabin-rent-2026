@@ -16,6 +16,11 @@ public sealed class ReviewsController(IReviewService service) : ControllerBase
     public Task<IReadOnlyCollection<ReviewDto>> Get([FromQuery] int? cabinId, CancellationToken cancellationToken) =>
         service.GetAsync(cabinId, true, cancellationToken);
 
+    [HttpGet("mine")]
+    [Authorize(Roles = "Guest")]
+    public Task<IReadOnlyCollection<ReviewDto>> GetMine(CancellationToken cancellationToken) =>
+        service.GetMineAsync(User.GetUserId(), cancellationToken);
+
     [HttpGet("management")]
     [Authorize(Roles = "Admin,Owner")]
     public Task<IReadOnlyCollection<ReviewDto>> GetManaged([FromQuery] int? cabinId, [FromQuery] int? rating,

@@ -6,6 +6,8 @@ import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
 import '../../reservations/presentation/reservation_form_screen.dart';
 import '../../favorites/presentation/favorites_controller.dart';
+import '../../reviews/domain/review.dart';
+import '../../reviews/presentation/reviews_controller.dart';
 import 'cabins_controller.dart';
 
 class CabinDetailsScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class CabinDetailsScreen extends StatefulWidget {
 
 class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
   late Future<CabinDetails> _details;
+  late Future<List<Review>> _reviews;
 
   @override
   void initState() {
@@ -35,6 +38,9 @@ class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
 
   void _load() {
     _details = context.read<CabinsController>().getCabin(widget.summary.id);
+    _reviews = context.read<ReviewsController>().getApprovedForCabin(
+      widget.summary.id,
+    );
   }
 
   void _retry() => setState(_load);
@@ -56,6 +62,7 @@ class _CabinDetailsScreenState extends State<CabinDetailsScreen> {
           averageRating: widget.summary.averageRating,
           searchCriteria: widget.searchCriteria,
           onReservationCreated: widget.onReservationCreated,
+          reviews: _reviews,
         );
       },
     ),
@@ -68,12 +75,14 @@ class _DetailsContent extends StatelessWidget {
     this.averageRating,
     this.searchCriteria,
     this.onReservationCreated,
+    required this.reviews,
   });
 
   final CabinDetails details;
   final double? averageRating;
   final CabinSearchCriteria? searchCriteria;
   final VoidCallback? onReservationCreated;
+  final Future<List<Review>> reviews;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -141,6 +150,10 @@ class _DetailsContent extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 26),
+            const _SectionTitle('Dojmovi gostiju'),
+            const SizedBox(height: 10),
+            _ReviewsSection(reviews: reviews),
+            const SizedBox(height: 26),
             const _SectionTitle('Domaćin'),
             const SizedBox(height: 10),
             ListTile(
@@ -167,6 +180,77 @@ class _DetailsContent extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _ReviewsSection extends StatelessWidget {
+  const _ReviewsSection({required this.reviews});
+
+  final Future<List<Review>> reviews;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<Review>>(
+    future: reviews,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+      if (snapshot.hasError) {
+        return const Text('Dojmove trenutno nije moguće učitati.');
+      }
+      final values = snapshot.data ?? const <Review>[];
+      if (values.isEmpty) {
+        return const Text('Ova vikendica još nema objavljenih dojmova.');
+      }
+      return Column(
+        children: values
+            .map(
+              (review) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              review.guestName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          ...List.generate(
+                            5,
+                            (index) => Icon(
+                              index < review.rating
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              size: 18,
+                              color: Colors.amber,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (review.comment?.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 8),
+                        Text(review.comment!.trim()),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      );
+    },
   );
 }
 

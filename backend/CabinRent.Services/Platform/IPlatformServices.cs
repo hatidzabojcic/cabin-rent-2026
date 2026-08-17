@@ -32,6 +32,7 @@ public interface IReservationService
 public interface IReviewService
 {
     Task<IReadOnlyCollection<ReviewDto>> GetAsync(int? cabinId, bool? approved, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<ReviewDto>> GetMineAsync(int guestId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<ReviewDto>> GetManagedAsync(int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default);
     Task<ReviewDto> CreateAsync(CreateReviewRequest request, int guestId, CancellationToken cancellationToken = default);
     Task<ReviewDto?> SetApprovalAsync(int id, bool isApproved, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
