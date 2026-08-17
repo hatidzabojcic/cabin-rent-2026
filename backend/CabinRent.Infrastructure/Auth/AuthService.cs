@@ -144,15 +144,36 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
             .SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
         if (user is null) return false;
 
+        var hasActiveReservations = await dbContext.Reservations
+            .AnyAsync(ProfileDeletionRules.BlockingReservationFor(userId), cancellationToken);
+        if (hasActiveReservations)
+            throw new InvalidOperationException("Profil nije moguće obrisati dok imate rezervacije na čekanju ili potvrđene rezervacije.");
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTime.UtcNow;
+        var anonymousKey = $"deleted_{user.Id}_{Guid.NewGuid():N}";
+        var profileImageUrl = user.ProfileImageUrl;
         user.IsActive = false;
+        user.DeletedAtUtc = now;
         user.UpdatedAtUtc = now;
+        user.FirstName = "Obrisani";
+        user.LastName = "korisnik";
+        user.Email = $"{anonymousKey}@deleted.cabinrent.local";
+        user.UserName = anonymousKey;
+        user.PhoneNumber = null;
+        user.ProfileImageUrl = null;
+        user.PasswordHash = PasswordHash.Create(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
         foreach (var token in user.RefreshTokens.Where(x => x.RevokedAtUtc == null))
         {
             token.RevokedAtUtc = now;
             token.RevokedByIp = ipAddress;
         }
+        await dbContext.Favorites.Where(x => x.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.Notifications.Where(x => x.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(profileImageUrl))
+            await imageStorage.DeleteAsync(profileImageUrl, cancellationToken);
         return true;
     }
 

@@ -15,6 +15,12 @@ class AuthController extends ChangeNotifier {
   AppUser? get user => _session?.user;
   bool get isLoading => status == AuthStatus.loading;
 
+  void clearError() {
+    if (errorMessage == null) return;
+    errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> restoreSession() async {
     status = AuthStatus.loading;
     notifyListeners();
@@ -86,6 +92,27 @@ class AuthController extends ChangeNotifier {
     _session = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  Future<bool> deactivateProfile() async {
+    if (_session == null || status == AuthStatus.loading) return false;
+    status = AuthStatus.loading;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.deactivateProfile();
+      _session = null;
+      status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return true;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+    } catch (_) {
+      errorMessage = 'Profil trenutno nije moguće obrisati.';
+    }
+    status = AuthStatus.authenticated;
+    notifyListeners();
+    return false;
   }
 
   Future<bool> updateProfile({

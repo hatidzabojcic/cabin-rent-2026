@@ -8,6 +8,50 @@ import 'edit_profile_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<void> _confirmProfileDeletion(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: Theme.of(dialogContext).colorScheme.error,
+        ),
+        title: const Text('Obrisati korisnički profil?'),
+        content: const Text(
+          'Profil će biti trajno deaktiviran i više se nećete moći prijaviti '
+          'ovim korisničkim računom. Historija rezervacija ostaje sačuvana.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Obriši profil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final auth = context.read<AuthController>();
+    final deleted = await auth.deactivateProfile();
+    if (!deleted && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            auth.errorMessage ?? 'Profil trenutno nije moguće obrisati.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _selectProfileImage(BuildContext context) async {
     final image = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -176,6 +220,31 @@ class ProfileScreen extends StatelessWidget {
           onPressed: auth.isLoading ? null : auth.logout,
           icon: const Icon(Icons.logout),
           label: const Text('Odjavi se'),
+        ),
+        const SizedBox(height: 22),
+        const Divider(),
+        const SizedBox(height: 10),
+        Text(
+          'Brisanje profila',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.error,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Ova radnja deaktivira korisnički račun i ne može se poništiti.',
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: auth.isLoading
+              ? null
+              : () => _confirmProfileDeletion(context),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Obriši korisnički profil'),
         ),
       ],
     );

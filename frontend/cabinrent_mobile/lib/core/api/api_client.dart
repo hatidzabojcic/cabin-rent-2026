@@ -24,6 +24,7 @@ class ApiClient {
         body: body == null ? null : jsonEncode(body),
       ),
     ),
+    authenticated: authenticated,
   );
   Future<Map<String, dynamic>> getObject(
     String path, {
@@ -33,6 +34,7 @@ class ApiClient {
       authenticated,
       () => _client.get(_uri(path), headers: _headers(authenticated)),
     ),
+    authenticated: authenticated,
   );
   Future<List<dynamic>> getList(
     String path, {
@@ -42,6 +44,7 @@ class ApiClient {
       authenticated,
       () => _client.get(_uri(path), headers: _headers(authenticated)),
     ),
+    authenticated: authenticated,
   );
   Future<Map<String, dynamic>> put(
     String path, {
@@ -56,6 +59,7 @@ class ApiClient {
         body: jsonEncode(body),
       ),
     ),
+    authenticated: authenticated,
   );
   Future<Map<String, dynamic>> patch(
     String path, {
@@ -70,6 +74,7 @@ class ApiClient {
         body: body == null ? null : jsonEncode(body),
       ),
     ),
+    authenticated: authenticated,
   );
 
   Future<void> delete(String path, {bool authenticated = false}) async {
@@ -80,7 +85,7 @@ class ApiClient {
     if (_ok(response)) return;
     final value = _json(response);
     throw ApiException(
-      _message(value, response.statusCode),
+      _message(value, response.statusCode, authenticated: authenticated),
       statusCode: response.statusCode,
     );
   }
@@ -108,6 +113,7 @@ class ApiClient {
       );
       return http.Response.fromStream(await _client.send(request));
     }),
+    authenticated: authenticated,
   );
 
   Future<http.Response> _send(
@@ -147,28 +153,38 @@ class ApiClient {
   Object? _json(http.Response response) => response.body.isEmpty
       ? <String, dynamic>{}
       : jsonDecode(utf8.decode(response.bodyBytes));
-  Map<String, dynamic> _decode(http.Response response) {
+  Map<String, dynamic> _decode(
+    http.Response response, {
+    required bool authenticated,
+  }) {
     final value = _json(response);
     if (_ok(response)) return value as Map<String, dynamic>;
     throw ApiException(
-      _message(value, response.statusCode),
+      _message(value, response.statusCode, authenticated: authenticated),
       statusCode: response.statusCode,
     );
   }
 
-  List<dynamic> _decodeList(http.Response response) {
+  List<dynamic> _decodeList(
+    http.Response response, {
+    required bool authenticated,
+  }) {
     final value = _json(response);
     if (_ok(response)) return value as List<dynamic>;
     throw ApiException(
-      _message(value, response.statusCode),
+      _message(value, response.statusCode, authenticated: authenticated),
       statusCode: response.statusCode,
     );
   }
 
   bool _ok(http.Response response) =>
       response.statusCode >= 200 && response.statusCode < 300;
-  String _message(Object? value, int statusCode) {
-    if (statusCode == 401) {
+  String _message(
+    Object? value,
+    int statusCode, {
+    required bool authenticated,
+  }) {
+    if (statusCode == 401 && authenticated) {
       return 'Sesija je istekla. Prijavite se ponovo.';
     }
     const fallback = 'Došlo je do greške pri komunikaciji sa serverom.';

@@ -122,11 +122,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextButton(
                       onPressed: auth.isLoading
                           ? null
-                          : () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            ),
+                          : () {
+                              auth.clearError();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
                       child: const Text('Nemate račun? Registrujte se'),
                     ),
                   ],

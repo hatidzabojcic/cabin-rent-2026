@@ -76,6 +76,12 @@ class AuthRepository {
     }
   }
 
+  Future<void> deactivateProfile() async {
+    await _api.delete('/api/auth/me', authenticated: true);
+    _api.accessToken = null;
+    await _storage.clear();
+  }
+
   Future<AppUser> updateProfile({
     required String firstName,
     required String lastName,
