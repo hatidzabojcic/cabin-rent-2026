@@ -5,6 +5,7 @@ import '../domain/cabin_details.dart';
 import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
 import '../../reservations/presentation/reservation_form_screen.dart';
+import '../../favorites/presentation/favorites_controller.dart';
 import 'cabins_controller.dart';
 
 class CabinDetailsScreen extends StatefulWidget {
@@ -96,6 +97,7 @@ class _DetailsContent extends StatelessWidget {
                   ),
                 ),
                 if (averageRating != null) _Rating(value: averageRating!),
+                _DetailsFavoriteButton(cabinId: details.id),
               ],
             ),
             const SizedBox(height: 8),
@@ -166,6 +168,35 @@ class _DetailsContent extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _DetailsFavoriteButton extends StatelessWidget {
+  const _DetailsFavoriteButton({required this.cabinId});
+
+  final int cabinId;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<FavoritesController>();
+    final selected = controller.contains(cabinId);
+    return IconButton(
+      tooltip: selected ? 'Ukloni iz omiljenih' : 'Dodaj u omiljene',
+      onPressed: controller.isUpdating(cabinId)
+          ? null
+          : () async {
+              final success = await controller.toggle(cabinId);
+              if (!success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(controller.errorMessage!)),
+                );
+              }
+            },
+      icon: Icon(
+        selected ? Icons.favorite : Icons.favorite_border,
+        color: selected ? Colors.red : null,
+      ),
+    );
+  }
 }
 
 class _SelectedStay extends StatelessWidget {

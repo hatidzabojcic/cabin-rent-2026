@@ -8,6 +8,8 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/cabins/data/cabins_repository.dart';
 import 'features/cabins/presentation/cabins_controller.dart';
+import 'features/favorites/data/favorites_repository.dart';
+import 'features/favorites/presentation/favorites_controller.dart';
 import 'features/notifications/data/notifications_repository.dart';
 import 'features/notifications/presentation/notifications_controller.dart';
 import 'features/reservations/data/reservations_repository.dart';
@@ -26,6 +28,9 @@ void main() {
         ),
         ChangeNotifierProvider(
           create: (_) => CabinsController(CabinsRepository(api)),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => FavoritesController(FavoritesRepository(api)),
         ),
         ChangeNotifierProvider(
           create: (_) => ReservationsController(ReservationsRepository(api)),

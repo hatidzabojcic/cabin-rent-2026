@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cabins/presentation/cabins_screen.dart';
+import '../../favorites/presentation/favorites_controller.dart';
+import '../../favorites/presentation/favorites_screen.dart';
 import '../../notifications/presentation/notifications_controller.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -24,6 +26,7 @@ class _HomeShellState extends State<HomeShell> {
     _notificationsController = context.read<NotificationsController>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _notificationsController.start();
+      context.read<FavoritesController>().load();
     });
   }
 
@@ -45,6 +48,7 @@ class _HomeShellState extends State<HomeShell> {
       const _WelcomePage(),
       CabinsScreen(onReservationCreated: _showReservations),
       const ReservationsScreen(),
+      FavoritesScreen(onReservationCreated: _showReservations),
       NotificationsScreen(onOpenReservations: _showReservations),
       const ProfileScreen(),
     ];
@@ -70,6 +74,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Rezervacije',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'Omiljene',
           ),
           NavigationDestination(
             icon: _NotificationIcon(count: unreadCount),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../favorites/presentation/favorites_controller.dart';
 import '../domain/cabin_search_criteria.dart';
 import '../domain/cabin_summary.dart';
 import 'cabin_details_screen.dart';
@@ -249,7 +250,7 @@ class _CabinCard extends StatelessWidget {
                       const Icon(Icons.star, size: 18, color: Colors.amber),
                       Text(cabin.averageRating!.toStringAsFixed(1)),
                     ],
-                    const SizedBox(width: 5),
+                    _FavoriteButton(cabinId: cabin.id),
                     const Icon(Icons.chevron_right),
                   ],
                 ),
@@ -270,6 +271,35 @@ class _CabinCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _FavoriteButton extends StatelessWidget {
+  const _FavoriteButton({required this.cabinId});
+
+  final int cabinId;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<FavoritesController>();
+    final selected = controller.contains(cabinId);
+    return IconButton(
+      tooltip: selected ? 'Ukloni iz omiljenih' : 'Dodaj u omiljene',
+      onPressed: controller.isUpdating(cabinId)
+          ? null
+          : () async {
+              final success = await controller.toggle(cabinId);
+              if (!success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(controller.errorMessage!)),
+                );
+              }
+            },
+      icon: Icon(
+        selected ? Icons.favorite : Icons.favorite_border,
+        color: selected ? Colors.red : null,
+      ),
+    );
+  }
 }
 
 class _AvailabilitySearch extends StatelessWidget {

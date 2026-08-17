@@ -72,6 +72,19 @@ class ApiClient {
     ),
   );
 
+  Future<void> delete(String path, {bool authenticated = false}) async {
+    final response = await _send(
+      authenticated,
+      () => _client.delete(_uri(path), headers: _headers(authenticated)),
+    );
+    if (_ok(response)) return;
+    final value = _json(response);
+    throw ApiException(
+      _message(value, response.statusCode),
+      statusCode: response.statusCode,
+    );
+  }
+
   Future<Map<String, dynamic>> postMultipart(
     String path, {
     required List<int> bytes,
