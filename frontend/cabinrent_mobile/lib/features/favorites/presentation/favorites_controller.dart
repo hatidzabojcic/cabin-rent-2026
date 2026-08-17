@@ -12,6 +12,7 @@ class FavoritesController extends ChangeNotifier {
   bool isLoading = false;
   bool hasLoaded = false;
   String? errorMessage;
+  int revision = 0;
   final Set<int> _updating = {};
 
   bool contains(int cabinId) =>
@@ -53,6 +54,7 @@ class FavoritesController extends ChangeNotifier {
       } else {
         await _repository.remove(cabinId);
       }
+      revision++;
       return true;
     } catch (_) {
       if (removed != null) favorites = [...favorites, removed];

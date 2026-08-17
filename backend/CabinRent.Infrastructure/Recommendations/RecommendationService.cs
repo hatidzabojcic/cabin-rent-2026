@@ -23,20 +23,33 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
         var preferredCabinIds = preferences.Select(x => x.Id).Distinct().ToArray();
         var preferredCityIds = preferences.Select(x => x.CityId).Distinct().ToArray();
         var preferredTypeIds = preferences.Select(x => x.CabinTypeId).Distinct().ToArray();
-        var completedCabinIds = await dbContext.Reservations.AsNoTracking()
-            .Where(x => x.GuestId == userId && x.Status == ReservationStatus.Completed)
+        var activelyReservedCabinIds = await dbContext.Reservations.AsNoTracking()
+            .Where(x => x.GuestId == userId
+                && (x.Status == ReservationStatus.Pending || x.Status == ReservationStatus.Confirmed))
             .Select(x => x.CabinId).Distinct().ToArrayAsync(cancellationToken);
-
-        var similarGuestIds = preferredCabinIds.Length == 0
+        var excludedCabinIds = preferredCabinIds
+            .Union(activelyReservedCabinIds)
+            .ToArray();
+        var guestsWithSimilarStays = preferredCabinIds.Length == 0
             ? []
             : await dbContext.Reservations.AsNoTracking()
-                .Where(x => x.GuestId != userId && x.Status == ReservationStatus.Completed
+                .Where(x => x.GuestId != userId && x.Guest.IsActive
+                    && x.Status == ReservationStatus.Completed
                     && preferredCabinIds.Contains(x.CabinId))
                 .Select(x => x.GuestId).Distinct().ToArrayAsync(cancellationToken);
+        var guestsWithSimilarFavorites = preferredCabinIds.Length == 0
+            ? []
+            : await dbContext.Favorites.AsNoTracking()
+                .Where(x => x.UserId != userId && x.User.IsActive
+                    && preferredCabinIds.Contains(x.CabinId))
+                .Select(x => x.UserId).Distinct().ToArrayAsync(cancellationToken);
+        var similarGuestIds = guestsWithSimilarStays
+            .Union(guestsWithSimilarFavorites)
+            .ToArray();
 
         var candidates = await dbContext.Cabins.AsNoTracking()
             .Where(CabinVisibilityRules.PubliclyVisible)
-            .Where(x => !completedCabinIds.Contains(x.Id))
+            .Where(x => !excludedCabinIds.Contains(x.Id))
             .Select(x => new Candidate(
                 x.Id,
                 x.Name,
@@ -50,12 +63,11 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
                     && reservation.Status == ReservationStatus.Completed),
                 x.Reservations.Count(reservation => reservation.Status == ReservationStatus.Completed),
                 dbContext.Reviews.Count(review => review.CabinId == x.Id && review.IsApproved),
-                dbContext.Favorites.Count(favorite => favorite.CabinId == x.Id),
                 preferredCityIds.Contains(x.CityId) || preferredTypeIds.Contains(x.CabinTypeId)))
             .ToListAsync(cancellationToken);
 
         var personalized = preferences.Count > 0;
-        return candidates
+        var rankedCandidates = candidates
             .Select(candidate => new RecommendationDto(
                 candidate.Id,
                 candidate.Name,
@@ -69,17 +81,31 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
                     candidate.CompletedStays,
                     candidate.AverageRating,
                     candidate.ReviewCount,
-                    candidate.FavoriteCount,
                     candidate.MatchesPreference),
                 RecommendationRules.Reason(
                     candidate.SimilarGuestStays,
-                    candidate.MatchesPreference,
+                    candidate.CompletedStays,
                     candidate.AverageRating,
-                    candidate.ReviewCount),
+                    candidate.ReviewCount,
+                    candidate.MatchesPreference),
                 personalized))
             .OrderByDescending(x => x.Score)
             .ThenByDescending(x => x.AverageRating)
+            .ThenByDescending(x => candidates.Single(candidate => candidate.Id == x.CabinId).CompletedStays)
             .ThenBy(x => x.Name)
+            .ToList();
+
+        var cabinsWithActivity = candidates
+            .Where(candidate => candidate.SimilarGuestStays > 0
+                || candidate.CompletedStays > 0
+                || candidate.ReviewCount > 0)
+            .Select(candidate => candidate.Id)
+            .ToHashSet();
+        var recommendations = cabinsWithActivity.Count > 0
+            ? rankedCandidates.Where(x => cabinsWithActivity.Contains(x.CabinId))
+            : rankedCandidates;
+
+        return recommendations
             .Take(resultLimit)
             .ToList();
     }
@@ -95,6 +121,5 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
         int SimilarGuestStays,
         int CompletedStays,
         int ReviewCount,
-        int FavoriteCount,
         bool MatchesPreference);
 }
