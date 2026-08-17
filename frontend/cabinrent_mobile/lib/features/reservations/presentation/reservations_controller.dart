@@ -41,6 +41,36 @@ class ReservationsController extends ChangeNotifier {
     }
   }
 
+  Future<Reservation?> reschedule({
+    required int id,
+    required DateTime checkIn,
+    required DateTime checkOut,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final updated = await _repository.reschedule(
+        id: id,
+        checkIn: checkIn,
+        checkOut: checkOut,
+      );
+      reservations = reservations
+          .map((reservation) => reservation.id == id ? updated : reservation)
+          .toList();
+      return updated;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+      return null;
+    } catch (_) {
+      errorMessage = 'Termin rezervacije trenutno nije moguće promijeniti.';
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<Reservation?> create({
     required int cabinId,
     required DateTime checkIn,

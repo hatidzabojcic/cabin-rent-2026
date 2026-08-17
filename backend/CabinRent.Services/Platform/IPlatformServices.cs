@@ -27,6 +27,7 @@ public interface IReservationService
     Task<ReservationDto> CreateAsync(CreateReservationRequest request, int guestId, CancellationToken cancellationToken = default);
     Task<ReservationDto?> UpdateStatusAsync(int id, UpdateReservationStatusRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
     Task<ReservationDto?> CancelAsync(int id, int guestId, CancellationToken cancellationToken = default);
+    Task<ReservationDto?> RescheduleAsync(int id, RescheduleReservationRequest request, int guestId, CancellationToken cancellationToken = default);
 }
 
 public interface IReviewService

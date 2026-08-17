@@ -112,4 +112,46 @@ void main() {
     ]);
     expect(reservation.confirmationCode, 'CR-TEST-013');
   });
+
+  test('reschedules reservation using authenticated API payload', () async {
+    late http.Request capturedRequest;
+    final client = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response(
+        jsonEncode({
+          'id': 13,
+          'confirmationCode': 'CR-TEST-013',
+          'cabinId': 5,
+          'cabinName': 'Test Vikendica',
+          'checkIn': '2026-10-02',
+          'checkOut': '2026-10-05',
+          'adults': 2,
+          'children': 0,
+          'pricePerNight': 300,
+          'totalPrice': 900,
+          'status': 'Pending',
+          'paymentStatus': 'Pending',
+          'paidAmount': 0,
+          'paymentCurrency': 'BAM',
+        }),
+        200,
+      );
+    });
+    final api = ApiClient(client: client)..accessToken = 'guest-token';
+
+    final reservation = await ReservationsRepository(api).reschedule(
+      id: 13,
+      checkIn: DateTime(2026, 10, 2),
+      checkOut: DateTime(2026, 10, 5),
+    );
+    final body = jsonDecode(capturedRequest.body) as Map<String, dynamic>;
+
+    expect(capturedRequest.method, 'PATCH');
+    expect(capturedRequest.url.path, '/api/reservations/13/reschedule');
+    expect(capturedRequest.headers['Authorization'], 'Bearer guest-token');
+    expect(body, {'checkIn': '2026-10-02', 'checkOut': '2026-10-05'});
+    expect(reservation.status, 'Pending');
+    expect(reservation.nights, 3);
+    expect(reservation.totalPrice, 900);
+  });
 }

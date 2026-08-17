@@ -56,6 +56,14 @@ class Reservation {
   final DateTime? paidAtUtc;
   bool get canCancel => status == 'Pending' || status == 'Confirmed';
   bool get canReview => status == 'Completed';
+  bool get canReschedule {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return (status == 'Pending' || status == 'Confirmed') &&
+        checkIn.isAfter(today) &&
+        paymentStatus != 'Paid';
+  }
+
   int get nights => checkOut.difference(checkIn).inDays;
   double get remainingAmount => (totalPrice - paidAmount).clamp(0, totalPrice);
 }

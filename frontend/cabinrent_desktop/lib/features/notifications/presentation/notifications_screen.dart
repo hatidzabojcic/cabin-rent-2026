@@ -238,6 +238,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   IconData _icon(String type) => switch (type) {
     'ReservationCreated' => Icons.calendar_month_outlined,
+    'ReservationRescheduled' => Icons.event_repeat_outlined,
     'ReservationStatusChanged' => Icons.event_available_outlined,
     'ReviewCreated' => Icons.rate_review_outlined,
     _ => Icons.notifications_outlined,

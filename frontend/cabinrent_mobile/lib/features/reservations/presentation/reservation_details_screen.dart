@@ -5,6 +5,7 @@ import '../../reviews/presentation/review_form_screen.dart';
 import '../../reviews/presentation/reviews_controller.dart';
 import '../domain/reservation.dart';
 import 'reservations_controller.dart';
+import 'reservation_reschedule_screen.dart';
 
 class ReservationDetailsScreen extends StatefulWidget {
   const ReservationDetailsScreen({required this.reservation, super.key});
@@ -75,6 +76,21 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     }
   }
 
+  Future<void> _reschedule() async {
+    final updated = await Navigator.of(context).push<Reservation>(
+      MaterialPageRoute<Reservation>(
+        builder: (_) => ReservationRescheduleScreen(reservation: _reservation),
+      ),
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _reservation = updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Novi termin je poslan vlasniku na potvrdu.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final reviews = context.watch<ReviewsController>();
@@ -138,6 +154,16 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             ),
           ],
           const SizedBox(height: 22),
+          if (_reservation.canReschedule) ...[
+            OutlinedButton.icon(
+              onPressed: context.watch<ReservationsController>().isLoading
+                  ? null
+                  : _reschedule,
+              icon: const Icon(Icons.event_repeat_outlined),
+              label: const Text('Promijeni termin'),
+            ),
+            const SizedBox(height: 10),
+          ],
           if (_reservation.canCancel)
             OutlinedButton.icon(
               onPressed: context.watch<ReservationsController>().isLoading

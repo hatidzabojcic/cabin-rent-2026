@@ -27,4 +27,9 @@ public static class ReservationStatusRules
 
     public static bool CanGuestCancel(ReservationStatus status, DateOnly checkIn, DateOnly today) =>
         status is ReservationStatus.Pending or ReservationStatus.Confirmed && checkIn > today;
+
+    public static bool CanGuestReschedule(ReservationStatus status, DateOnly checkIn, DateOnly today, PaymentStatus? paymentStatus) =>
+        status is ReservationStatus.Pending or ReservationStatus.Confirmed &&
+        checkIn > today &&
+        paymentStatus != PaymentStatus.Paid;
 }

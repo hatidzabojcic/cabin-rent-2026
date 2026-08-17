@@ -54,4 +54,12 @@ public sealed class ReservationsController(IReservationService service) : Contro
         var reservation = await service.CancelAsync(id, User.GetUserId(), cancellationToken);
         return reservation is null ? NotFound() : Ok(reservation);
     }
+
+    [HttpPatch("{id:int}/reschedule")]
+    [Authorize(Roles = "Guest")]
+    public async Task<ActionResult<ReservationDto>> Reschedule(int id, RescheduleReservationRequest request, CancellationToken cancellationToken)
+    {
+        var reservation = await service.RescheduleAsync(id, request, User.GetUserId(), cancellationToken);
+        return reservation is null ? NotFound() : Ok(reservation);
+    }
 }

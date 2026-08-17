@@ -23,3 +23,9 @@ public sealed class UpdateReservationStatusRequest
 {
     [Required] public required string Status { get; init; }
 }
+
+public sealed class RescheduleReservationRequest
+{
+    public DateOnly CheckIn { get; init; }
+    public DateOnly CheckOut { get; init; }
+}

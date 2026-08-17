@@ -240,6 +240,7 @@ class _EmptyState extends StatelessWidget {
 
 IconData _notificationIcon(String type) => switch (type) {
   'ReservationCreated' => Icons.calendar_month_outlined,
+  'ReservationRescheduled' => Icons.event_repeat_outlined,
   'ReservationStatusChanged' => Icons.event_available_outlined,
   'ReservationCancelled' => Icons.event_busy_outlined,
   'ReviewCreated' => Icons.rate_review_outlined,

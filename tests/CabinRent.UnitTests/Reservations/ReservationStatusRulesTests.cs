@@ -38,4 +38,24 @@ public sealed class ReservationStatusRulesTests
     [InlineData(ReservationStatus.Confirmed, -1)]
     public void Guest_cannot_cancel_invalid_reservation(ReservationStatus status, int daysUntilCheckIn) =>
         Assert.False(ReservationStatusRules.CanGuestCancel(status, new DateOnly(2026, 9, 1).AddDays(daysUntilCheckIn), new DateOnly(2026, 9, 1)));
+
+    [Theory]
+    [InlineData(ReservationStatus.Pending, PaymentStatus.Pending)]
+    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Failed)]
+    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Refunded)]
+    public void Guest_can_reschedule_upcoming_unpaid_reservation(ReservationStatus status, PaymentStatus paymentStatus) =>
+        Assert.True(ReservationStatusRules.CanGuestReschedule(
+            status, new DateOnly(2026, 9, 5), new DateOnly(2026, 9, 1), paymentStatus));
+
+    [Theory]
+    [InlineData(ReservationStatus.Completed, PaymentStatus.Pending, 5)]
+    [InlineData(ReservationStatus.Cancelled, PaymentStatus.Pending, 5)]
+    [InlineData(ReservationStatus.Rejected, PaymentStatus.Pending, 5)]
+    [InlineData(ReservationStatus.Pending, PaymentStatus.Paid, 5)]
+    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Pending, 0)]
+    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Pending, -1)]
+    public void Guest_cannot_reschedule_invalid_reservation(
+        ReservationStatus status, PaymentStatus paymentStatus, int daysUntilCheckIn) =>
+        Assert.False(ReservationStatusRules.CanGuestReschedule(
+            status, new DateOnly(2026, 9, 1).AddDays(daysUntilCheckIn), new DateOnly(2026, 9, 1), paymentStatus));
 }

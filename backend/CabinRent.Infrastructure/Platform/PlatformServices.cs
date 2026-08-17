@@ -186,6 +186,68 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
         return await GetByIdAsync(id, cancellationToken);
     }
 
+    public async Task<ReservationDto?> RescheduleAsync(int id, RescheduleReservationRequest request, int guestId, CancellationToken cancellationToken = default)
+    {
+        if (request.CheckOut <= request.CheckIn)
+            throw new ArgumentException("Datum odlaska mora biti nakon datuma dolaska.");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (request.CheckIn <= today)
+            throw new ArgumentException("Novi datum dolaska mora biti u budućnosti.");
+
+        var reservation = await dbContext.Reservations
+            .Include(x => x.Cabin).ThenInclude(x => x.Owner)
+            .Include(x => x.Payment)
+            .SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
+        if (reservation is null) return null;
+        if (!ReservationStatusRules.CanGuestReschedule(reservation.Status, reservation.CheckIn, today, reservation.Payment?.Status))
+            throw new InvalidOperationException("Termin je moguće promijeniti samo za buduću neplaćenu rezervaciju koja je na čekanju ili potvrđena.");
+        if (!reservation.Cabin.IsActive || !reservation.Cabin.Owner.IsActive)
+            throw new InvalidOperationException("Vikendica trenutno nije dostupna za rezervaciju.");
+
+        var overlaps = await dbContext.Reservations.AnyAsync(x => x.Id != reservation.Id &&
+            x.CabinId == reservation.CabinId &&
+            x.Status != ReservationStatus.Cancelled && x.Status != ReservationStatus.Rejected &&
+            request.CheckIn < x.CheckOut && request.CheckOut > x.CheckIn, cancellationToken);
+        var blocked = await dbContext.AvailabilityBlocks.AnyAsync(x => x.CabinId == reservation.CabinId &&
+            request.CheckIn < x.To && request.CheckOut > x.From, cancellationToken);
+        if (overlaps || blocked)
+            throw new InvalidOperationException("Vikendica nije dostupna u odabranom terminu.");
+
+        var nights = request.CheckOut.DayNumber - request.CheckIn.DayNumber;
+        var totalPrice = reservation.Cabin.PricePerNight * nights;
+        reservation.CheckIn = request.CheckIn;
+        reservation.CheckOut = request.CheckOut;
+        reservation.PricePerNight = reservation.Cabin.PricePerNight;
+        reservation.TotalPrice = totalPrice;
+        reservation.Status = ReservationStatus.Pending;
+        reservation.UpdatedAtUtc = DateTime.UtcNow;
+        if (reservation.Payment is null)
+        {
+            reservation.Payment = new Payment
+            {
+                Amount = totalPrice,
+                Currency = "BAM",
+                Provider = "Pending",
+                Status = PaymentStatus.Pending
+            };
+        }
+        else
+        {
+            reservation.Payment.Amount = totalPrice;
+            reservation.Payment.Provider = "Pending";
+            reservation.Payment.ProviderReference = null;
+            reservation.Payment.Status = PaymentStatus.Pending;
+            reservation.Payment.PaidAtUtc = null;
+            reservation.Payment.UpdatedAtUtc = DateTime.UtcNow;
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await notificationPublisher.PublishAsync(new NotificationEvent(
+            Guid.NewGuid(), reservation.Cabin.OwnerId, "ReservationRescheduled", "Zatražena promjena termina",
+            $"Gost je promijenio termin rezervacije {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name}. Potrebna je nova potvrda.",
+            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+        return await GetByIdAsync(id, cancellationToken);
+    }
+
     private static System.Linq.Expressions.Expression<Func<Reservation, ReservationDto>> Projection() => x =>
         new ReservationDto(x.Id, x.ConfirmationCode, x.CabinId, x.Cabin.Name, x.Cabin.OwnerId, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,

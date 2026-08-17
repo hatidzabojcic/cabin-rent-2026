@@ -12,6 +12,18 @@ class ReservationsRepository {
     await _api.patch('/api/reservations/$id/cancel', authenticated: true),
   );
 
+  Future<Reservation> reschedule({
+    required int id,
+    required DateTime checkIn,
+    required DateTime checkOut,
+  }) async => Reservation.fromJson(
+    await _api.patch(
+      '/api/reservations/$id/reschedule',
+      authenticated: true,
+      body: {'checkIn': _dateOnly(checkIn), 'checkOut': _dateOnly(checkOut)},
+    ),
+  );
+
   Future<Reservation> create({
     required int cabinId,
     required DateTime checkIn,
