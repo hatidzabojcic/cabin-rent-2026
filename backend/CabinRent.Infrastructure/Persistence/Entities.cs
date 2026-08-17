@@ -140,8 +140,12 @@ public sealed class Payment : Entity
     public required string Currency { get; set; }
     public required string Provider { get; set; }
     public string? ProviderReference { get; set; }
+    public string? FailureMessage { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
     public DateTime? PaidAtUtc { get; set; }
+    public decimal RefundedAmount { get; set; }
+    public string? RefundReference { get; set; }
+    public DateTime? RefundedAtUtc { get; set; }
     public int ReservationId { get; set; }
     public Reservation Reservation { get; set; } = null!;
 }

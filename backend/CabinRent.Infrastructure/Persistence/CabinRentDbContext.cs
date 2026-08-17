@@ -45,6 +45,7 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<Reservation>().Property(x => x.PricePerNight).HasPrecision(10, 2);
         modelBuilder.Entity<Reservation>().Property(x => x.TotalPrice).HasPrecision(12, 2);
         modelBuilder.Entity<Payment>().Property(x => x.Amount).HasPrecision(12, 2);
+        modelBuilder.Entity<Payment>().Property(x => x.RefundedAmount).HasPrecision(12, 2);
 
         modelBuilder.Entity<Reservation>().ToTable(t =>
         {

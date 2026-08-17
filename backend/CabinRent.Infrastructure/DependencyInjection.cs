@@ -9,6 +9,8 @@ using CabinRent.Services.Notifications;
 using CabinRent.Infrastructure.Notifications;
 using CabinRent.Infrastructure.Recommendations;
 using CabinRent.Services.Recommendations;
+using CabinRent.Services.Payments;
+using CabinRent.Infrastructure.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +51,15 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<INotificationEventPublisher, RabbitMqNotificationPublisher>();
         services.AddScoped<IRecommendationService, RecommendationService>();
+        var stripeSection = configuration.GetSection(StripeOptions.SectionName);
+        services.AddSingleton<IOptions<StripeOptions>>(Options.Create(new StripeOptions
+        {
+            SecretKey = stripeSection["SecretKey"] ?? string.Empty,
+            PublishableKey = stripeSection["PublishableKey"] ?? string.Empty,
+            WebhookSecret = stripeSection["WebhookSecret"] ?? string.Empty
+        }));
+        services.AddSingleton<IPaymentGateway, StripePaymentGateway>();
+        services.AddScoped<IPaymentService, PaymentService>();
         return services;
     }
 }

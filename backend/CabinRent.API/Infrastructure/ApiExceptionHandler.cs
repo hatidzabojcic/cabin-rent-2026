@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using CabinRent.Services.Payments;
 
 namespace CabinRent.API.Infrastructure;
 
@@ -13,6 +14,8 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             KeyNotFoundException => StatusCodes.Status404NotFound,
             InvalidOperationException => StatusCodes.Status409Conflict,
             UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            PaymentProviderException => StatusCodes.Status502BadGateway,
+            PaymentConfigurationException => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status500InternalServerError
         };
         httpContext.Response.StatusCode = status;
