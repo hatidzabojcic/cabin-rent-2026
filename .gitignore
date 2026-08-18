@@ -3,6 +3,8 @@ obj/
 .vs/
 .idea/
 .env
+.tools/
+.stripe-listener/
 .dotnet-home/
 *.user
 *.suo

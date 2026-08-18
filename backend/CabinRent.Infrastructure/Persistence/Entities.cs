@@ -137,6 +137,7 @@ public sealed class Reservation : Entity
 public sealed class Payment : Entity
 {
     public decimal Amount { get; set; }
+    public decimal? ChargedAmount { get; set; }
     public required string Currency { get; set; }
     public required string Provider { get; set; }
     public string? ProviderReference { get; set; }
@@ -148,6 +149,32 @@ public sealed class Payment : Entity
     public DateTime? RefundedAtUtc { get; set; }
     public int ReservationId { get; set; }
     public Reservation Reservation { get; set; } = null!;
+}
+
+public sealed class PaymentWebhookEvent : Entity
+{
+    public required string ProviderEventId { get; set; }
+    public required string Type { get; set; }
+    public string? ProviderReference { get; set; }
+    public required string Outcome { get; set; }
+    public string? Details { get; set; }
+    public DateTime ProcessedAtUtc { get; set; }
+}
+
+public sealed class NotificationOutbox : Entity
+{
+    public Guid EventId { get; set; }
+    public int RecipientUserId { get; set; }
+    public required string Type { get; set; }
+    public required string Title { get; set; }
+    public required string Message { get; set; }
+    public string? RelatedEntityType { get; set; }
+    public int? RelatedEntityId { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+    public DateTime? PublishedAtUtc { get; set; }
+    public int AttemptCount { get; set; }
+    public DateTime? NextAttemptAtUtc { get; set; }
+    public string? LastError { get; set; }
 }
 
 public sealed class Review : Entity

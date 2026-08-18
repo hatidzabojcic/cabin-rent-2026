@@ -8,3 +8,5 @@ public sealed record PaymentIntentDto(
     string Status,
     string ClientSecret,
     string PublishableKey);
+
+public sealed record PaymentWebhookResultDto(string EventId, string Outcome);

@@ -64,11 +64,36 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
+    public GatewayWebhookEvent ParseWebhook(string payload, string signature)
+    {
+        if (string.IsNullOrWhiteSpace(_options.WebhookSecret))
+            throw new PaymentConfigurationException("Stripe webhook nije konfigurisan. Postavite STRIPE_WEBHOOK_SECRET u .env datoteci.");
+
+        try
+        {
+            var stripeEvent = EventUtility.ConstructEvent(payload, signature, _options.WebhookSecret);
+            var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+            return new GatewayWebhookEvent(
+                stripeEvent.Id,
+                stripeEvent.Type,
+                paymentIntent?.Id,
+                paymentIntent?.AmountReceived,
+                paymentIntent?.Currency,
+                paymentIntent?.LastPaymentError?.Message);
+        }
+        catch (StripeException exception)
+        {
+            throw new InvalidPaymentWebhookException("Stripe webhook potpis nije validan.", exception);
+        }
+    }
+
     private void EnsureConfigured()
     {
         if (_client is null || string.IsNullOrWhiteSpace(_options.PublishableKey))
             throw new PaymentConfigurationException("Stripe sandbox nije konfigurisan. Postavite STRIPE_SECRET_KEY i STRIPE_PUBLISHABLE_KEY u .env datoteci.");
-        if (!_options.SecretKey.StartsWith("sk_test_", StringComparison.Ordinal) ||
+        var isTestSecretKey = _options.SecretKey.StartsWith("sk_test_", StringComparison.Ordinal) ||
+                              _options.SecretKey.StartsWith("rkcs_test_", StringComparison.Ordinal);
+        if (!isTestSecretKey ||
             !_options.PublishableKey.StartsWith("pk_test_", StringComparison.Ordinal))
             throw new PaymentConfigurationException("Za razvoj je dozvoljena samo Stripe sandbox konfiguracija (test ključevi).");
     }

@@ -43,4 +43,19 @@ public sealed class PaymentRulesTests
     [InlineData("0.01", 1)]
     public void Amount_is_converted_to_minor_units(string value, long expected) =>
         Assert.Equal(expected, PaymentRules.ToMinorUnits(decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture)));
+
+    [Theory]
+    [InlineData("1200.00", 120000, "BAM", true)]
+    [InlineData("1200.00", 119999, "BAM", false)]
+    [InlineData("1200.00", 120000, "EUR", false)]
+    public void Received_payment_must_match_expected_amount_and_currency(
+        string expectedAmount,
+        long receivedAmount,
+        string receivedCurrency,
+        bool expected) =>
+        Assert.Equal(expected, PaymentRules.MatchesExpectedPayment(
+            decimal.Parse(expectedAmount, System.Globalization.CultureInfo.InvariantCulture),
+            "BAM",
+            receivedAmount,
+            receivedCurrency));
 }

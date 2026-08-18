@@ -16,6 +16,7 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             UnauthorizedAccessException => StatusCodes.Status403Forbidden,
             PaymentProviderException => StatusCodes.Status502BadGateway,
             PaymentConfigurationException => StatusCodes.Status503ServiceUnavailable,
+            InvalidPaymentWebhookException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
         httpContext.Response.StatusCode = status;

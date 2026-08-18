@@ -11,4 +11,10 @@ public static class PaymentRules
 
     public static long ToMinorUnits(decimal amount) =>
         checked((long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero));
+
+    public static decimal FromMinorUnits(long amount) => amount / 100m;
+
+    public static bool MatchesExpectedPayment(decimal expectedAmount, string expectedCurrency, long amountReceived, string currency) =>
+        ToMinorUnits(expectedAmount) == amountReceived &&
+        string.Equals(expectedCurrency, currency, StringComparison.OrdinalIgnoreCase);
 }

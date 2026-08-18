@@ -14,6 +14,8 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
     public DbSet<Amenity> Amenities => Set<Amenity>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<AvailabilityBlock> AvailabilityBlocks => Set<AvailabilityBlock>();
@@ -34,6 +36,10 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<Amenity>().HasIndex(x => x.Name).IsUnique();
         modelBuilder.Entity<Reservation>().HasIndex(x => x.ConfirmationCode).IsUnique();
         modelBuilder.Entity<Payment>().HasIndex(x => x.ReservationId).IsUnique();
+        modelBuilder.Entity<Payment>().HasIndex(x => x.ProviderReference).IsUnique().HasFilter("[ProviderReference] IS NOT NULL");
+        modelBuilder.Entity<PaymentWebhookEvent>().HasIndex(x => x.ProviderEventId).IsUnique();
+        modelBuilder.Entity<NotificationOutbox>().HasIndex(x => x.EventId).IsUnique();
+        modelBuilder.Entity<NotificationOutbox>().HasIndex(x => new { x.PublishedAtUtc, x.NextAttemptAtUtc, x.CreatedAtUtc });
         modelBuilder.Entity<Review>().HasIndex(x => x.ReservationId).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
@@ -45,7 +51,19 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<Reservation>().Property(x => x.PricePerNight).HasPrecision(10, 2);
         modelBuilder.Entity<Reservation>().Property(x => x.TotalPrice).HasPrecision(12, 2);
         modelBuilder.Entity<Payment>().Property(x => x.Amount).HasPrecision(12, 2);
+        modelBuilder.Entity<Payment>().Property(x => x.ChargedAmount).HasPrecision(12, 2);
         modelBuilder.Entity<Payment>().Property(x => x.RefundedAmount).HasPrecision(12, 2);
+
+        modelBuilder.Entity<PaymentWebhookEvent>().Property(x => x.ProviderEventId).HasMaxLength(255);
+        modelBuilder.Entity<PaymentWebhookEvent>().Property(x => x.Type).HasMaxLength(100);
+        modelBuilder.Entity<PaymentWebhookEvent>().Property(x => x.ProviderReference).HasMaxLength(255);
+        modelBuilder.Entity<PaymentWebhookEvent>().Property(x => x.Outcome).HasMaxLength(50);
+        modelBuilder.Entity<PaymentWebhookEvent>().Property(x => x.Details).HasMaxLength(1000);
+        modelBuilder.Entity<NotificationOutbox>().Property(x => x.Type).HasMaxLength(100);
+        modelBuilder.Entity<NotificationOutbox>().Property(x => x.Title).HasMaxLength(200);
+        modelBuilder.Entity<NotificationOutbox>().Property(x => x.Message).HasMaxLength(1000);
+        modelBuilder.Entity<NotificationOutbox>().Property(x => x.RelatedEntityType).HasMaxLength(100);
+        modelBuilder.Entity<NotificationOutbox>().Property(x => x.LastError).HasMaxLength(1000);
 
         modelBuilder.Entity<Reservation>().ToTable(t =>
         {
