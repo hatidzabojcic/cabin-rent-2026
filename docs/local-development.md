@@ -17,6 +17,17 @@ Vrijednosti ispod služe isključivo lokalnom razvoju. Njihov trajni izvor je `.
 
 U bazi se aplikacijske lozinke nikada ne čuvaju kao tekst. Seed proces ih pretvara u PBKDF2-SHA256 hash. Promjena lozinke u `.env` ne mijenja već kreiranog korisnika; za to ćemo koristiti password-change/reset funkcionalnost.
 
+## Stripe webhook listener
+
+Stripe CLI se lokalno čuva u ignorisanom folderu `.tools/stripe`, a ključevi u ignorisanoj `.env` datoteci.
+Nakon restarta računara ili prije testiranja plaćanja iz root foldera projekta pokrenite:
+
+```powershell
+.\scripts\start-stripe-webhook.ps1
+```
+
+Skripta pokreće listener za Stripe testni račun, ažurira `STRIPE_WEBHOOK_SECRET`, ponovo učitava samo API kontejner i provjerava `/health` endpoint. Vrijednosti ključeva se ne ispisuju u terminal.
+
 ## Prvo pokretanje
 
 ```powershell

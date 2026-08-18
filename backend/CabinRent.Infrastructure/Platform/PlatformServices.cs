@@ -1,11 +1,11 @@
 using CabinRent.Infrastructure.Persistence;
+using CabinRent.Infrastructure.Notifications;
 using CabinRent.Model.Catalog;
 using CabinRent.Model.Favorites;
 using CabinRent.Model.Reservations;
 using CabinRent.Model.Reviews;
 using CabinRent.Model.Users;
 using CabinRent.Services.Platform;
-using CabinRent.Services.Notifications;
 using CabinRent.Infrastructure.Cabins;
 using CabinRent.Model.Notifications;
 using Microsoft.EntityFrameworkCore;
@@ -93,7 +93,7 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
             x.OwnedCabins.SelectMany(cabin => cabin.Reservations).Count());
 }
 
-public sealed class ReservationService(CabinRentDbContext dbContext, INotificationEventPublisher notificationPublisher) : IReservationService
+public sealed class ReservationService(CabinRentDbContext dbContext) : IReservationService
 {
     public async Task<IReadOnlyCollection<ReservationDto>> GetAsync(int? guestId, int? ownerId, int? cabinId, string? status, CancellationToken cancellationToken = default)
     {
@@ -139,12 +139,15 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
             PricePerNight = cabin.PricePerNight, TotalPrice = cabin.PricePerNight * nights,
             Payment = new Payment { Amount = cabin.PricePerNight * nights, Currency = "BAM", Provider = "Pending", Status = PaymentStatus.Pending }
         };
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         dbContext.Reservations.Add(reservation);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await notificationPublisher.PublishAsync(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), cabin.OwnerId, "ReservationCreated", "Nova rezervacija",
             $"Primljena je nova rezervacija {reservation.ConfirmationCode} za vikendicu {cabin.Name}.",
-            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+            "Reservation", reservation.Id, DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return (await GetByIdAsync(reservation.Id, cancellationToken))!;
     }
 
@@ -160,11 +163,11 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
             throw new InvalidOperationException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
         reservation.Status = status;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await notificationPublisher.PublishAsync(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.GuestId, "ReservationStatusChanged", "Promijenjen status rezervacije",
             $"Rezervacija {reservation.ConfirmationCode} sada ima status {StatusLabel(status)}.",
-            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+            "Reservation", reservation.Id, DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(id, cancellationToken);
     }
 
@@ -178,11 +181,11 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
 
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await notificationPublisher.PublishAsync(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.Cabin.OwnerId, "ReservationCancelled", "Otkazana rezervacija",
             $"Gost je otkazao rezervaciju {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name}.",
-            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+            "Reservation", reservation.Id, DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(id, cancellationToken);
     }
 
@@ -240,11 +243,11 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
             reservation.Payment.PaidAtUtc = null;
             reservation.Payment.UpdatedAtUtc = DateTime.UtcNow;
         }
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await notificationPublisher.PublishAsync(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.Cabin.OwnerId, "ReservationRescheduled", "Zatražena promjena termina",
             $"Gost je promijenio termin rezervacije {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name}. Potrebna je nova potvrda.",
-            "Reservation", reservation.Id, DateTime.UtcNow), cancellationToken);
+            "Reservation", reservation.Id, DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(id, cancellationToken);
     }
 
@@ -268,7 +271,7 @@ public sealed class ReservationService(CabinRentDbContext dbContext, INotificati
     };
 }
 
-public sealed class ReviewService(CabinRentDbContext dbContext, INotificationEventPublisher notificationPublisher) : IReviewService
+public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
 {
     public async Task<IReadOnlyCollection<ReviewDto>> GetAsync(int? cabinId, bool? approved, CancellationToken cancellationToken = default)
     {
@@ -312,12 +315,15 @@ public sealed class ReviewService(CabinRentDbContext dbContext, INotificationEve
         if (reservation.GuestId != guestId) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
         if (reservation.Review is not null) throw new InvalidOperationException("Rezervacija već ima recenziju.");
         var review = new Review { Reservation = reservation, CabinId = reservation.CabinId, GuestId = reservation.GuestId, Rating = request.Rating, Comment = request.Comment, IsApproved = false };
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         dbContext.Reviews.Add(review);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await notificationPublisher.PublishAsync(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.Cabin.OwnerId, "ReviewCreated", "Nova recenzija",
             $"Gost je ostavio novu recenziju za vikendicu {reservation.Cabin.Name}.",
-            "Review", review.Id, DateTime.UtcNow), cancellationToken);
+            "Review", review.Id, DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return await dbContext.Reviews.AsNoTracking().Where(x => x.Id == review.Id).Select(Projection()).SingleAsync(cancellationToken);
     }
 

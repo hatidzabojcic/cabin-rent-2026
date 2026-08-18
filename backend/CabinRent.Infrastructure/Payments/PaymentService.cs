@@ -1,4 +1,5 @@
 using CabinRent.Infrastructure.Persistence;
+using CabinRent.Infrastructure.Notifications;
 using CabinRent.Model.Payments;
 using CabinRent.Services.Payments;
 using Microsoft.EntityFrameworkCore;
@@ -156,7 +157,7 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         var paid = outcome == "Paid";
         var reservation = payment.Reservation;
         var occurredAtUtc = DateTime.UtcNow;
-        AddOutbox(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.GuestId,
             paid ? "PaymentSucceeded" : "PaymentFailed",
             paid ? "Plaćanje uspješno" : "Plaćanje nije uspjelo",
@@ -164,7 +165,7 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
                 ? $"Rezervacija {reservation.ConfirmationCode} je uspješno plaćena."
                 : $"Plaćanje rezervacije {reservation.ConfirmationCode} nije uspjelo. Možete pokušati ponovo.",
             "Reservation", reservation.Id, occurredAtUtc));
-        AddOutbox(new NotificationEvent(
+        dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.Cabin.OwnerId,
             paid ? "PaymentReceived" : "PaymentFailed",
             paid ? "Primljena uplata" : "Neuspjelo plaćanje rezervacije",
@@ -173,19 +174,6 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
                 : $"Plaćanje rezervacije {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name} nije uspjelo.",
             "Reservation", reservation.Id, occurredAtUtc));
     }
-
-    private void AddOutbox(NotificationEvent notification) =>
-        dbContext.NotificationOutbox.Add(new NotificationOutbox
-        {
-            EventId = notification.EventId,
-            RecipientUserId = notification.RecipientUserId,
-            Type = notification.Type,
-            Title = notification.Title,
-            Message = notification.Message,
-            RelatedEntityType = notification.RelatedEntityType,
-            RelatedEntityId = notification.RelatedEntityId,
-            OccurredAtUtc = notification.OccurredAtUtc
-        });
 
     private async Task<PaymentWebhookResultDto> StoreWebhookResultAsync(
         GatewayWebhookEvent webhook,

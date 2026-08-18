@@ -15,11 +15,11 @@ public sealed class NotificationWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await EnsureDatabaseAsync(stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                await EnsureDatabaseAsync(stoppingToken);
                 await ConsumeAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -28,7 +28,7 @@ public sealed class NotificationWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Notification worker nije povezan. Novi pokušaj za 5 sekundi.");
+                logger.LogWarning(exception, "Notification worker čeka bazu ili RabbitMQ. Novi pokušaj za 5 sekundi.");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }

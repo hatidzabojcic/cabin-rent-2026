@@ -25,6 +25,13 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
     networks: [cabinrent-network]
 
   cabinrent-api:
@@ -78,7 +85,8 @@ services:
       cabinrent-sql:
         condition: service_healthy
       cabinrent-rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    restart: unless-stopped
     networks: [cabinrent-network]
 
 volumes:
