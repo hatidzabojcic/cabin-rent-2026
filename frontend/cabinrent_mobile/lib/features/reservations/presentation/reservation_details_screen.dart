@@ -20,6 +20,7 @@ class ReservationDetailsScreen extends StatefulWidget {
 
 class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   late Reservation _reservation = widget.reservation;
+  bool _isRefreshing = false;
 
   Future<void> _cancel() async {
     final confirmed = await showDialog<bool>(
@@ -97,9 +98,25 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final result = await payments.pay(_reservation.id);
     if (!mounted) return;
 
+    if (result == PaymentResult.succeeded) {
+      final confirmation = await _waitForPaymentConfirmation();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(switch (confirmation) {
+            _PaymentConfirmation.paid => 'Plaćanje je uspješno evidentirano.',
+            _PaymentConfirmation.failed =>
+              'Plaćanje nije uspjelo. Možete pokušati ponovo.',
+            _PaymentConfirmation.pending =>
+              'Plaćanje je prihvaćeno i čeka potvrdu servera.',
+          }),
+        ),
+      );
+      return;
+    }
+
     final message = switch (result) {
-      PaymentResult.succeeded =>
-        'Plaćanje je poslano. Status će biti osvježen nakon Stripe potvrde.',
+      PaymentResult.succeeded => '',
       PaymentResult.canceled => 'Plaćanje je otkazano.',
       PaymentResult.failed =>
         payments.errorMessage ?? 'Plaćanje nije bilo uspješno.',
@@ -109,12 +126,64 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<_PaymentConfirmation> _waitForPaymentConfirmation() async {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return _PaymentConfirmation.pending;
+      final updated = await context.read<ReservationsController>().refreshOne(
+        _reservation.id,
+      );
+      if (!mounted) return _PaymentConfirmation.pending;
+      if (updated != null) setState(() => _reservation = updated);
+      if (updated?.paymentStatus == 'Paid') {
+        context.read<PaymentsController>().resolveConfirmation(_reservation.id);
+        return _PaymentConfirmation.paid;
+      }
+      if (updated?.paymentStatus == 'Failed') {
+        context.read<PaymentsController>().resolveConfirmation(_reservation.id);
+        return _PaymentConfirmation.failed;
+      }
+    }
+    return _PaymentConfirmation.pending;
+  }
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    final updated = await context.read<ReservationsController>().refreshOne(
+      _reservation.id,
+    );
+    if (!mounted) return;
+    if (updated != null) {
+      setState(() => _reservation = updated);
+      if (updated.paymentStatus == 'Paid' ||
+          updated.paymentStatus == 'Failed') {
+        context.read<PaymentsController>().resolveConfirmation(updated.id);
+      }
+    }
+    setState(() => _isRefreshing = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final reviews = context.watch<ReviewsController>();
     final review = reviews.reviewForReservation(_reservation.id);
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalji rezervacije')),
+      appBar: AppBar(
+        title: const Text('Detalji rezervacije'),
+        actions: [
+          IconButton(
+            onPressed: _isRefreshing ? null : _refresh,
+            tooltip: 'Osvježi podatke',
+            icon: _isRefreshing
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
@@ -173,13 +242,25 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           ],
           const SizedBox(height: 22),
           if (_reservation.canPay) ...[
+            if (context.watch<PaymentsController>().isAwaitingConfirmation(
+              _reservation.id,
+            ))
+              const _PaymentPendingNotice(),
             FilledButton.icon(
-              onPressed: context.watch<PaymentsController>().isProcessing
+              onPressed:
+                  context.watch<PaymentsController>().isProcessing ||
+                      context
+                          .watch<PaymentsController>()
+                          .isAwaitingConfirmation(_reservation.id)
                   ? null
                   : _pay,
               icon: const Icon(Icons.credit_card_outlined),
               label: Text(
-                context.watch<PaymentsController>().isProcessing
+                context.watch<PaymentsController>().isAwaitingConfirmation(
+                      _reservation.id,
+                    )
+                    ? 'Čeka potvrdu plaćanja'
+                    : context.watch<PaymentsController>().isProcessing
                     ? 'Pokretanje plaćanja...'
                     : 'Plati rezervaciju',
               ),
@@ -233,6 +314,33 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       ),
     );
   }
+}
+
+enum _PaymentConfirmation { paid, failed, pending }
+
+class _PaymentPendingNotice extends StatelessWidget {
+  const _PaymentPendingNotice();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: const Padding(
+        padding: EdgeInsets.all(14),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('Stripe potvrda plaćanja je u toku.')),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _PaymentSection extends StatelessWidget {

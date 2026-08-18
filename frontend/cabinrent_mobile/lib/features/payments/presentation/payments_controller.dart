@@ -13,6 +13,14 @@ class PaymentsController extends ChangeNotifier {
 
   bool isProcessing = false;
   String? errorMessage;
+  final Set<int> _awaitingConfirmation = {};
+
+  bool isAwaitingConfirmation(int reservationId) =>
+      _awaitingConfirmation.contains(reservationId);
+
+  void resolveConfirmation(int reservationId) {
+    if (_awaitingConfirmation.remove(reservationId)) notifyListeners();
+  }
 
   Future<PaymentResult> pay(int reservationId) async {
     isProcessing = true;
@@ -32,6 +40,7 @@ class PaymentsController extends ChangeNotifier {
         ),
       );
       await Stripe.instance.presentPaymentSheet();
+      _awaitingConfirmation.add(reservationId);
       return PaymentResult.succeeded;
     } on StripeException catch (error) {
       if (error.error.code == FailureCode.Canceled) {

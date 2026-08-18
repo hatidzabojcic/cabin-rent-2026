@@ -7,6 +7,45 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('loads a single reservation with payment evidence', () async {
+    late http.Request capturedRequest;
+    final client = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response(
+        jsonEncode({
+          'id': 21,
+          'confirmationCode': 'CR-TEST-021',
+          'cabinId': 3,
+          'cabinName': 'Una forest lodge',
+          'checkIn': '2026-11-10',
+          'checkOut': '2026-11-12',
+          'adults': 2,
+          'children': 0,
+          'pricePerNight': 145,
+          'totalPrice': 290,
+          'status': 'Confirmed',
+          'paymentStatus': 'Paid',
+          'paidAmount': 290,
+          'paymentCurrency': 'BAM',
+          'paidAtUtc': '2026-08-18T20:15:00Z',
+        }),
+        200,
+      );
+    });
+    final api = ApiClient(client: client)..accessToken = 'guest-token';
+
+    final reservation = await ReservationsRepository(api).getById(21);
+
+    expect(capturedRequest.method, 'GET');
+    expect(capturedRequest.url.path, '/api/reservations/21');
+    expect(capturedRequest.headers['Authorization'], 'Bearer guest-token');
+    expect(reservation.paymentStatus, 'Paid');
+    expect(reservation.paidAmount, 290);
+    expect(reservation.remainingAmount, 0);
+    expect(reservation.paidAtUtc, DateTime.utc(2026, 8, 18, 20, 15));
+    expect(reservation.canPay, isFalse);
+  });
+
   test('creates reservation using authenticated API payload', () async {
     late http.Request capturedRequest;
     final client = MockClient((request) async {

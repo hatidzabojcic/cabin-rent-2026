@@ -96,17 +96,22 @@ class _ReservationCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Text(
+                reservation.cabinName,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: Text(
-                      reservation.cabinName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
                   Chip(label: Text(reservationStatus(reservation.status))),
+                  Chip(
+                    avatar: const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(paymentStatusLabel(reservation.paymentStatus)),
+                  ),
                 ],
               ),
               Text(
@@ -141,6 +146,14 @@ class _ReservationCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (reservation.remainingAmount > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Preostalo za uplatu: '
+                  '${reservation.remainingAmount.toStringAsFixed(2)} KM',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               if (reservation.canCancel) ...[
                 const SizedBox(height: 12),
                 Align(

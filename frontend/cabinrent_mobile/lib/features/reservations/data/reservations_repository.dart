@@ -8,6 +8,9 @@ class ReservationsRepository {
     '/api/reservations',
     authenticated: true,
   )).map((x) => Reservation.fromJson(x as Map<String, dynamic>)).toList();
+  Future<Reservation> getById(int id) async => Reservation.fromJson(
+    await _api.getObject('/api/reservations/$id', authenticated: true),
+  );
   Future<Reservation> cancel(int id) async => Reservation.fromJson(
     await _api.patch('/api/reservations/$id/cancel', authenticated: true),
   );
