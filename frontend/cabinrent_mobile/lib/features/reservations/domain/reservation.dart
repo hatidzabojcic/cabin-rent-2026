@@ -56,6 +56,11 @@ class Reservation {
   final DateTime? paidAtUtc;
   bool get canCancel => status == 'Pending' || status == 'Confirmed';
   bool get canReview => status == 'Completed';
+  bool get canPay =>
+      status == 'Confirmed' &&
+      paymentStatus != 'Paid' &&
+      paymentStatus != 'Refunded' &&
+      checkOut.isAfter(DateTime.now());
   bool get canReschedule {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

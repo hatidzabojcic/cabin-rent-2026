@@ -12,6 +12,8 @@ import 'features/favorites/data/favorites_repository.dart';
 import 'features/favorites/presentation/favorites_controller.dart';
 import 'features/notifications/data/notifications_repository.dart';
 import 'features/notifications/presentation/notifications_controller.dart';
+import 'features/payments/data/payments_repository.dart';
+import 'features/payments/presentation/payments_controller.dart';
 import 'features/recommendations/data/recommendations_repository.dart';
 import 'features/recommendations/presentation/recommendations_controller.dart';
 import 'features/reservations/data/reservations_repository.dart';
@@ -44,6 +46,9 @@ void main() {
         ),
         ChangeNotifierProvider(
           create: (_) => NotificationsController(NotificationsRepository(api)),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PaymentsController(PaymentsRepository(api)),
         ),
         ChangeNotifierProvider(
           create: (_) =>

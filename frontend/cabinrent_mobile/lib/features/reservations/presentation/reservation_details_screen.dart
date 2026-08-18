@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../payments/presentation/payments_controller.dart';
 import '../../reviews/presentation/review_form_screen.dart';
 import '../../reviews/presentation/reviews_controller.dart';
 import '../domain/reservation.dart';
@@ -91,6 +92,23 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     );
   }
 
+  Future<void> _pay() async {
+    final payments = context.read<PaymentsController>();
+    final result = await payments.pay(_reservation.id);
+    if (!mounted) return;
+
+    final message = switch (result) {
+      PaymentResult.succeeded =>
+        'Plaćanje je poslano. Status će biti osvježen nakon Stripe potvrde.',
+      PaymentResult.canceled => 'Plaćanje je otkazano.',
+      PaymentResult.failed =>
+        payments.errorMessage ?? 'Plaćanje nije bilo uspješno.',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final reviews = context.watch<ReviewsController>();
@@ -154,6 +172,20 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             ),
           ],
           const SizedBox(height: 22),
+          if (_reservation.canPay) ...[
+            FilledButton.icon(
+              onPressed: context.watch<PaymentsController>().isProcessing
+                  ? null
+                  : _pay,
+              icon: const Icon(Icons.credit_card_outlined),
+              label: Text(
+                context.watch<PaymentsController>().isProcessing
+                    ? 'Pokretanje plaćanja...'
+                    : 'Plati rezervaciju',
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           if (_reservation.canReschedule) ...[
             OutlinedButton.icon(
               onPressed: context.watch<ReservationsController>().isLoading
