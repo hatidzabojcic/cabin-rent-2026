@@ -21,9 +21,15 @@ if (-not (Test-Path -LiteralPath $stripePath)) {
 $envLines = [System.Collections.Generic.List[string]](Get-Content -LiteralPath $envPath)
 $secretEntry = $envLines | Where-Object { $_ -like 'STRIPE_SECRET_KEY=*' } | Select-Object -First 1
 $secretKey = if ($secretEntry) { $secretEntry.Substring('STRIPE_SECRET_KEY='.Length).Trim() } else { '' }
+$apiPortEntry = $envLines | Where-Object { $_ -like 'API_PORT=*' } | Select-Object -First 1
+$apiPort = if ($apiPortEntry) { $apiPortEntry.Substring('API_PORT='.Length).Trim() } else { '' }
 if ($secretKey -notlike 'sk_test_*') {
     throw 'STRIPE_SECRET_KEY mora sadrzavati standardni Stripe testni kljuc.'
 }
+if ($apiPort -notmatch '^\d+$') {
+    throw 'API_PORT mora sadrzavati validan port.'
+}
+$apiBaseUrl = "http://localhost:$apiPort"
 
 if (Test-Path -LiteralPath $pidPath) {
     $previousPid = Get-Content -LiteralPath $pidPath -ErrorAction SilentlyContinue
@@ -43,7 +49,7 @@ try {
             '--events',
             'payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing',
             '--forward-to',
-            'http://localhost:8080/api/Payments/webhook',
+            "$apiBaseUrl/api/Payments/webhook",
             '--color',
             'off'
         ) `
@@ -108,7 +114,7 @@ finally {
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
     Start-Sleep -Seconds 1
     try {
-        $health = Invoke-WebRequest -Uri 'http://localhost:8080/health' -UseBasicParsing -TimeoutSec 5
+        $health = Invoke-WebRequest -Uri "$apiBaseUrl/health" -UseBasicParsing -TimeoutSec 5
         if ($health.StatusCode -eq 200) {
             Write-Host 'Stripe webhook listener radi, a CabinRent API je spreman.' -ForegroundColor Green
             exit 0
