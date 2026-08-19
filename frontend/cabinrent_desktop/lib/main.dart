@@ -13,6 +13,7 @@ import 'features/reports/data/reports_repository.dart';
 import 'features/notifications/data/notifications_repository.dart';
 import 'features/notifications/presentation/notifications_controller.dart';
 import 'features/users/data/users_repository.dart';
+import 'features/catalog/data/reference_data_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ void main() {
           create: (_) => NotificationsController(notificationsRepository),
         ),
         Provider.value(value: UsersRepository(apiClient)),
+        Provider.value(value: ReferenceDataRepository(apiClient)),
         ChangeNotifierProvider(
           create: (_) => AuthController(authRepository)..restoreSession(),
         ),

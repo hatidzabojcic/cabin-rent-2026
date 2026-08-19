@@ -11,6 +11,7 @@ class UsersRepository {
     bool? isActive,
   }) async {
     final parameters = <String, String>{
+      'pageSize': '100',
       if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
       if (role != null && role.isNotEmpty) 'role': role,
       if (isActive != null) 'isActive': isActive.toString(),
@@ -18,7 +19,7 @@ class UsersRepository {
     final query = parameters.isEmpty
         ? ''
         : '?${Uri(queryParameters: parameters).query}';
-    return (await _api.getList(
+    return (await _api.getPagedItems(
           '/api/users/management$query',
           authenticated: true,
         ))
@@ -34,4 +35,17 @@ class UsersRepository {
           authenticated: true,
         ),
       );
+
+  Future<ManagedUser> create(Map<String, dynamic> data) async =>
+      ManagedUser.fromJson(
+        await _api.post('/api/users', body: data, authenticated: true),
+      );
+
+  Future<ManagedUser> update(int id, Map<String, dynamic> data) async =>
+      ManagedUser.fromJson(
+        await _api.put('/api/users/$id', body: data, authenticated: true),
+      );
+
+  Future<void> delete(int id) =>
+      _api.delete('/api/users/$id', authenticated: true);
 }

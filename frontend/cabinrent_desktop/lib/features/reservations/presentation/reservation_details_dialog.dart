@@ -88,6 +88,24 @@ class ReservationDetailsDialog extends StatelessWidget {
               const SizedBox(height: 8),
               Text(reservation.specialRequests!),
             ],
+            if (reservation.statusChangedAtUtc != null) ...[
+              const SizedBox(height: 20),
+              _Section(
+                title: 'Posljednja promjena statusa',
+                rows: [
+                  (
+                    'Promijenio/la',
+                    reservation.statusChangedByUserName ?? 'Sistem',
+                  ),
+                  (
+                    'Vrijeme',
+                    '${formatDate(reservation.statusChangedAtUtc!.toLocal())} ${reservation.statusChangedAtUtc!.toLocal().hour.toString().padLeft(2, '0')}:${reservation.statusChangedAtUtc!.toLocal().minute.toString().padLeft(2, '0')}',
+                  ),
+                  if (reservation.statusChangeReason?.isNotEmpty == true)
+                    ('Razlog', reservation.statusChangeReason!),
+                ],
+              ),
+            ],
           ],
         ),
       ),

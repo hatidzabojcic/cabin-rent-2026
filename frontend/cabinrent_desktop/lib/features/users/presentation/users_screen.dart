@@ -8,6 +8,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/users_repository.dart';
 import '../domain/managed_user.dart';
 import 'user_details_dialog.dart';
+import 'user_form_dialog.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -105,6 +106,49 @@ class _UsersScreenState extends State<UsersScreen> {
     }
   }
 
+  Future<void> _openForm([ManagedUser? user]) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => UserFormDialog(user: user),
+    );
+    if (saved == true) await _load();
+  }
+
+  Future<void> _delete(ManagedUser user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Brisanje korisnika'),
+        content: Text(
+          'Da li \u017eelite ukloniti pristup korisniku „${user.fullName}“? '
+          'Historija rezervacija i finansijska evidencija bi\u0107e sa\u010duvane.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Obri\u0161i'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await context.read<UsersRepository>().delete(user.id);
+      await _load();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.watch<AuthController>().user!.id;
@@ -133,6 +177,12 @@ class _UsersScreenState extends State<UsersScreen> {
                   ],
                 ),
               ),
+              FilledButton.icon(
+                onPressed: _loading ? null : () => _openForm(),
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('Dodaj korisnika'),
+              ),
+              const SizedBox(width: 10),
               IconButton.filledTonal(
                 onPressed: _loading ? null : _load,
                 tooltip: 'Osvježi',
@@ -290,8 +340,14 @@ class _UsersScreenState extends State<UsersScreen> {
                             if (value == 'status') {
                               _toggleStatus(user);
                             }
+                            if (value == 'edit') _openForm(user);
+                            if (value == 'delete') _delete(user);
                           },
                           itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Uredi korisnika'),
+                            ),
                             const PopupMenuItem(
                               value: 'details',
                               child: Text('Prikaži detalje'),
@@ -302,6 +358,11 @@ class _UsersScreenState extends State<UsersScreen> {
                               child: Text(
                                 user.isActive ? 'Deaktiviraj' : 'Aktiviraj',
                               ),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              enabled: user.id != currentUserId,
+                              child: const Text('Obri\u0161i korisnika'),
                             ),
                           ],
                         ),

@@ -19,6 +19,10 @@ class Reservation {
     this.guestPhoneNumber,
     this.specialRequests,
     this.paymentStatus,
+    this.statusChangedByUserId,
+    this.statusChangedByUserName,
+    this.statusChangedAtUtc,
+    this.statusChangeReason,
   });
 
   factory Reservation.fromJson(Map<String, dynamic> json) => Reservation(
@@ -40,6 +44,12 @@ class Reservation {
     status: json['status'] as String,
     specialRequests: json['specialRequests'] as String?,
     paymentStatus: json['paymentStatus'] as String?,
+    statusChangedByUserId: json['statusChangedByUserId'] as int?,
+    statusChangedByUserName: json['statusChangedByUserName'] as String?,
+    statusChangedAtUtc: json['statusChangedAtUtc'] == null
+        ? null
+        : DateTime.parse(json['statusChangedAtUtc'] as String).toUtc(),
+    statusChangeReason: json['statusChangeReason'] as String?,
     createdAtUtc: DateTime.parse(json['createdAtUtc'] as String).toUtc(),
   );
 
@@ -61,6 +71,10 @@ class Reservation {
   final String status;
   final String? specialRequests;
   final String? paymentStatus;
+  final int? statusChangedByUserId;
+  final String? statusChangedByUserName;
+  final DateTime? statusChangedAtUtc;
+  final String? statusChangeReason;
   final DateTime createdAtUtc;
 
   int get nights => checkOut.difference(checkIn).inDays;

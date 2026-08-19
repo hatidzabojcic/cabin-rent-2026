@@ -54,30 +54,56 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   }
 
   Future<void> _changeStatus(Reservation reservation, String status) async {
-    final confirmed = await showDialog<bool>(
+    final reasonController = TextEditingController();
+    final requiresReason = status == 'Rejected';
+    final reason = await showDialog<String?>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Promjena statusa'),
-        content: Text(
-          'Promijeniti status rezervacije ${reservation.confirmationCode} u „${ReservationLabels.status(status)}“?',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Promijeniti status rezervacije ${reservation.confirmationCode} u „${ReservationLabels.status(status)}“?',
+            ),
+            if (requiresReason) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLength: 500,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Razlog odbijanja',
+                  hintText: 'Navedite razlog koji će ostati evidentiran.',
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Odustani'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              final value = reasonController.text.trim();
+              if (requiresReason && value.isEmpty) return;
+              Navigator.pop(context, value);
+            },
             child: const Text('Potvrdi'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    reasonController.dispose();
+    if (reason == null || !mounted) return;
     try {
       await context.read<ReservationsRepository>().updateStatus(
         reservation.id,
         status,
+        reason: reason.isEmpty ? null : reason,
       );
       await _load();
       if (mounted) {

@@ -5,8 +5,8 @@ class CabinsRepository {
   CabinsRepository(this._api);
   final ApiClient _api;
 
-  Future<List<Cabin>> getManagedCabins() async => (await _api.getList(
-    '/api/cabins/manage',
+  Future<List<Cabin>> getManagedCabins() async => (await _api.getPagedItems(
+    '/api/cabins/manage?pageSize=100',
     authenticated: true,
   )).map((item) => Cabin.fromJson(item as Map<String, dynamic>)).toList();
 
@@ -69,13 +69,13 @@ class CabinsRepository {
   Future<List<CatalogOption>> getAmenities() =>
       _catalog('/api/catalog/amenities');
 
-  Future<List<OwnerOption>> getOwners() async => (await _api.getList(
-    '/api/users?role=Owner',
+  Future<List<OwnerOption>> getOwners() async => (await _api.getPagedItems(
+    '/api/users?role=Owner&pageSize=100',
     authenticated: true,
   )).map((item) => OwnerOption.fromJson(item as Map<String, dynamic>)).toList();
 
   Future<List<CatalogOption>> _catalog(String path) async =>
-      (await _api.getList(path))
+      (await _api.getPagedItems('$path?pageSize=100', authenticated: true))
           .map((item) => CatalogOption.fromJson(item as Map<String, dynamic>))
           .toList();
 }

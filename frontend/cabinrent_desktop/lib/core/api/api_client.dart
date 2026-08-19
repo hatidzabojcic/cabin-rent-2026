@@ -47,6 +47,13 @@ class ApiClient {
     return _decodeList(response);
   }
 
+  Future<List<dynamic>> getPagedItems(
+    String path, {
+    bool authenticated = false,
+  }) async =>
+      (await getObject(path, authenticated: authenticated))['items']
+          as List<dynamic>;
+
   Future<Map<String, dynamic>> put(
     String path, {
     required Object body,

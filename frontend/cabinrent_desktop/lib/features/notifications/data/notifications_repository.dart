@@ -6,8 +6,13 @@ class NotificationsRepository {
   final ApiClient _api;
 
   Future<List<AppNotification>> getNotifications({bool? isRead}) async {
-    final query = isRead == null ? '' : '?isRead=$isRead';
-    return (await _api.getList('/api/notifications$query', authenticated: true))
+    final query = isRead == null
+        ? '?pageSize=100'
+        : '?isRead=$isRead&pageSize=100';
+    return (await _api.getPagedItems(
+          '/api/notifications$query',
+          authenticated: true,
+        ))
         .map((item) => AppNotification.fromJson(item as Map<String, dynamic>))
         .toList();
   }

@@ -12,6 +12,7 @@ class ReviewsRepository {
     String? search,
   }) async {
     final parameters = <String, String>{
+      'pageSize': '100',
       if (cabinId != null) 'cabinId': cabinId.toString(),
       if (rating != null) 'rating': rating.toString(),
       if (approved != null) 'approved': approved.toString(),
@@ -20,7 +21,7 @@ class ReviewsRepository {
     final query = parameters.isEmpty
         ? ''
         : '?${Uri(queryParameters: parameters).query}';
-    return (await _api.getList(
+    return (await _api.getPagedItems(
       '/api/reviews/management$query',
       authenticated: true,
     )).map((item) => Review.fromJson(item as Map<String, dynamic>)).toList();
