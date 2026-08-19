@@ -7,8 +7,8 @@ class RecommendationsRepository {
   final ApiClient _api;
 
   Future<List<Recommendation>> getRecommendations({int limit = 6}) async =>
-      (await _api.getList(
-            '/api/recommendations?limit=$limit',
+      (await _api.getPagedItems(
+            '/api/recommendations?pageSize=$limit',
             authenticated: true,
           ))
           .map((item) => Recommendation.fromJson(item as Map<String, dynamic>))

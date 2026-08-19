@@ -4,8 +4,8 @@ import '../domain/reservation.dart';
 class ReservationsRepository {
   ReservationsRepository(this._api);
   final ApiClient _api;
-  Future<List<Reservation>> getMine() async => (await _api.getList(
-    '/api/reservations',
+  Future<List<Reservation>> getMine() async => (await _api.getPagedItems(
+    '/api/reservations?pageSize=100',
     authenticated: true,
   )).map((x) => Reservation.fromJson(x as Map<String, dynamic>)).toList();
   Future<Reservation> getById(int id) async => Reservation.fromJson(

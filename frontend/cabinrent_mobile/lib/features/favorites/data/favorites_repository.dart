@@ -6,8 +6,8 @@ class FavoritesRepository {
 
   final ApiClient _api;
 
-  Future<List<Favorite>> getFavorites() async => (await _api.getList(
-    '/api/favorites',
+  Future<List<Favorite>> getFavorites() async => (await _api.getPagedItems(
+    '/api/favorites?pageSize=100',
     authenticated: true,
   )).map((item) => Favorite.fromJson(item as Map<String, dynamic>)).toList();
 

@@ -7,7 +7,10 @@ class NotificationsRepository {
   final ApiClient _api;
 
   Future<List<AppNotification>> getNotifications() async =>
-      (await _api.getList('/api/notifications', authenticated: true))
+      (await _api.getPagedItems(
+            '/api/notifications?pageSize=100',
+            authenticated: true,
+          ))
           .map(
             (value) => AppNotification.fromJson(value as Map<String, dynamic>),
           )

@@ -7,12 +7,12 @@ class ReviewsRepository {
   final ApiClient _api;
 
   Future<List<Review>> getApprovedForCabin(int cabinId) async =>
-      (await _api.getList('/api/reviews?cabinId=$cabinId'))
+      (await _api.getPagedItems('/api/reviews?cabinId=$cabinId&pageSize=100'))
           .map((value) => Review.fromJson(value as Map<String, dynamic>))
           .toList();
 
-  Future<List<Review>> getMine() async => (await _api.getList(
-    '/api/reviews/mine',
+  Future<List<Review>> getMine() async => (await _api.getPagedItems(
+    '/api/reviews/mine?pageSize=100',
     authenticated: true,
   )).map((value) => Review.fromJson(value as Map<String, dynamic>)).toList();
 
