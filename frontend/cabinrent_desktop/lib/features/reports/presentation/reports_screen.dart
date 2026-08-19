@@ -7,6 +7,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/reports_repository.dart';
 import '../domain/annual_report.dart';
 import '../domain/top_guests_report.dart';
+import '../services/report_pdf_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -23,6 +24,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _year = DateTime.now().year;
   int? _cabinId;
   bool _showTopGuests = false;
+  bool _exporting = false;
+
+  final _pdfService = ReportPdfService();
 
   bool get _isAdmin => context.read<AuthController>().user?.isAdmin ?? false;
 
@@ -172,10 +176,84 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ],
           ),
           const SizedBox(height: 20),
+          if (!_loading && _error == null) ...[
+            _reportActions(),
+            const SizedBox(height: 14),
+          ],
           Expanded(child: _content()),
         ],
       ),
     );
+  }
+
+  Widget _reportActions() => Row(
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      OutlinedButton.icon(
+        onPressed: _exporting ? null : () => _exportReport(print: false),
+        icon: const Icon(Icons.download_outlined),
+        label: const Text('Preuzmi PDF'),
+      ),
+      const SizedBox(width: 10),
+      FilledButton.tonalIcon(
+        onPressed: _exporting ? null : () => _exportReport(print: true),
+        icon: _exporting
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.print_outlined),
+        label: const Text('\u0160tampaj'),
+      ),
+    ],
+  );
+
+  Future<void> _exportReport({required bool print}) async {
+    setState(() => _exporting = true);
+    try {
+      final cabinLabel = _selectedCabinLabel;
+      final bytes = _showTopGuests && _isAdmin
+          ? await _pdfService.buildTopGuestsReport(
+              _topGuestsReport!,
+              cabinLabel: cabinLabel,
+            )
+          : await _pdfService.buildAnnualReport(
+              _report!,
+              cabinLabel: cabinLabel,
+            );
+      final reportName = _showTopGuests && _isAdmin
+          ? 'najcesci-gosti-$_year'
+          : 'godisnji-izvjestaj-$_year';
+
+      if (print) {
+        await _pdfService.print(bytes, name: reportName);
+      } else {
+        final path = await _pdfService.save(bytes, fileName: '$reportName.pdf');
+        if (path != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('PDF izvje\u0161taj je sa\u010duvan: $path'),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF nije mogu\u0107e kreirati: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  String get _selectedCabinLabel {
+    if (_cabinId == null) return 'Sve vikendice';
+    for (final cabin in _cabins) {
+      if (cabin.id == _cabinId) return cabin.name;
+    }
+    return 'Odabrana vikendica';
   }
 
   Widget _content() {
