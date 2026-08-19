@@ -12,6 +12,7 @@ import '../../notifications/presentation/notifications_controller.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../users/presentation/users_screen.dart';
 import '../../catalog/presentation/reference_data_screen.dart';
+import '../../announcements/presentation/announcements_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -86,6 +87,8 @@ class _AppShellState extends State<AppShell> {
           selectedIcon: Icon(Icons.list_alt),
           label: Text('\u0160ifrarnici'),
         ),
+      if (user.isAdmin)
+        const NavigationRailDestination(icon: Icon(Icons.campaign_outlined), selectedIcon: Icon(Icons.campaign), label: Text('Novosti')),
     ];
     final screens = <Widget>[
       const DashboardScreen(),
@@ -96,6 +99,7 @@ class _AppShellState extends State<AppShell> {
       const NotificationsScreen(),
       if (user.isAdmin) const UsersScreen(),
       if (user.isAdmin) const ReferenceDataScreen(),
+      if (user.isAdmin) const AnnouncementsScreen(),
     ];
 
     return Scaffold(
