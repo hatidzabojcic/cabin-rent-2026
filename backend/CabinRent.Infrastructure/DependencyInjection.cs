@@ -15,6 +15,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using CabinRent.Services.Announcements;
+using CabinRent.Infrastructure.Announcements;
 
 namespace CabinRent.Infrastructure;
 
@@ -52,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IFavoriteService, FavoriteService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IAnnouncementService, AnnouncementService>();
         services.AddSingleton<INotificationEventPublisher, RabbitMqNotificationPublisher>();
         services.AddScoped<IRecommendationService, RecommendationService>();
         var stripeSection = configuration.GetSection(StripeOptions.SectionName);
