@@ -37,6 +37,13 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<NotificationOutboxWorker>();
+var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+{
+    if (allowedOrigins.Length > 0)
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+}));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -60,15 +67,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         OnTokenValidated = async context =>
         {
             var subject = context.Principal?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
-            if (!int.TryParse(subject, out var userId))
+            var tokenVersionClaim = context.Principal?.FindFirst("token_version")?.Value;
+            if (!int.TryParse(subject, out var userId) || !int.TryParse(tokenVersionClaim, out var tokenVersion))
             {
                 context.Fail("Token ne sadrži validan identitet korisnika.");
                 return;
             }
 
             var dbContext = context.HttpContext.RequestServices.GetRequiredService<CabinRentDbContext>();
-            if (!await dbContext.Users.AnyAsync(x => x.Id == userId && x.IsActive, context.HttpContext.RequestAborted))
-                context.Fail("Korisnički račun nije aktivan.");
+            if (!await dbContext.Users.AnyAsync(
+                    x => x.Id == userId && x.IsActive && x.TokenVersion == tokenVersion,
+                    context.HttpContext.RequestAborted))
+                context.Fail("Korisnička sesija više nije aktivna.");
         }
     };
 });
@@ -104,6 +114,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRateLimiter();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

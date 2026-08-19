@@ -23,13 +23,13 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         var reservation = await dbContext.Reservations
             .Include(x => x.Payment)
             .SingleOrDefaultAsync(x => x.Id == reservationId, cancellationToken)
-            ?? throw new KeyNotFoundException("Rezervacija nije pronađena.");
+            ?? throw new ResourceNotFoundException("Rezervacija nije pronađena.");
 
         if (reservation.GuestId != guestId)
-            throw new UnauthorizedAccessException("Možete platiti samo vlastitu rezervaciju.");
+            throw new ForbiddenOperationException("Možete platiti samo vlastitu rezervaciju.");
         var payment = reservation.Payment;
         if (!PaymentRules.CanStartPayment(reservation.Status, payment?.Status, reservation.CheckOut, DateOnly.FromDateTime(DateTime.UtcNow)))
-            throw new InvalidOperationException(payment?.Status switch
+            throw new BusinessRuleException(payment?.Status switch
             {
                 PaymentStatus.Paid => "Rezervacija je već plaćena.",
                 PaymentStatus.Refunded => "Refundirana rezervacija se ne može ponovo platiti.",
@@ -97,10 +97,10 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
             .Where(x => x.ReservationId == reservationId && x.Reservation.GuestId == guestId)
             .Select(x => x.ProviderReference)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new KeyNotFoundException("Plaćanje nije pronađeno.");
+            ?? throw new ResourceNotFoundException("Plaćanje nije pronađeno.");
 
         if (string.IsNullOrWhiteSpace(paymentReference))
-            throw new InvalidOperationException("Stripe PaymentIntent još nije kreiran.");
+            throw new BusinessRuleException("Stripe PaymentIntent još nije kreiran.");
 
         var intent = await paymentGateway.GetIntentAsync(paymentReference, cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -109,9 +109,9 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
             .SingleAsync(x => x.ReservationId == reservationId, cancellationToken);
 
         if (payment.Reservation.GuestId != guestId)
-            throw new UnauthorizedAccessException("Možete potvrditi samo vlastito plaćanje.");
+            throw new ForbiddenOperationException("Možete potvrditi samo vlastito plaćanje.");
         if (!string.Equals(payment.ProviderReference, intent.Id, StringComparison.Ordinal))
-            throw new InvalidOperationException("Stripe PaymentIntent ne odgovara lokalnom plaćanju.");
+            throw new BusinessRuleException("Stripe PaymentIntent ne odgovara lokalnom plaćanju.");
 
         var outcome = ApplyIntentStatus(payment, intent);
         if (outcome is "Paid" or "Failed") AddPaymentNotifications(payment, outcome);
@@ -149,22 +149,22 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         if (snapshot is null) return false;
 
         var canManage = isAdmin || (isOwner && snapshot.OwnerId == actorId) || snapshot.GuestId == actorId;
-        if (!canManage) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
+        if (!canManage) throw new ForbiddenOperationException("Nemate pristup ovoj rezervaciji.");
         if (snapshot.Status == ReservationStatus.Cancelled && snapshot.PaymentStatus is not PaymentStatus.Paid)
             return true;
         if (snapshot.Status is ReservationStatus.Completed or ReservationStatus.Rejected)
-            throw new InvalidOperationException("Završenu ili odbijenu rezervaciju nije moguće otkazati.");
+            throw new BusinessRuleException("Završenu ili odbijenu rezervaciju nije moguće otkazati.");
         if (!isAdmin && !isOwner && !ReservationStatusRules.CanGuestCancel(
                 snapshot.Status,
                 await dbContext.Reservations.Where(x => x.Id == reservationId).Select(x => x.CheckIn).SingleAsync(cancellationToken),
                 DateOnly.FromDateTime(DateTime.UtcNow)))
-            throw new InvalidOperationException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
+            throw new BusinessRuleException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
 
         GatewayRefund? refund = null;
         if (snapshot.PaymentStatus == PaymentStatus.Paid)
         {
             if (string.IsNullOrWhiteSpace(snapshot.ProviderReference))
-                throw new InvalidOperationException("Plaćanje nema Stripe referencu i ne može biti automatski refundirano.");
+                throw new BusinessRuleException("Plaćanje nema Stripe referencu i ne može biti automatski refundirano.");
             var chargedAmount = snapshot.ChargedAmount ?? snapshot.PaymentAmount;
             refund = await paymentGateway.RefundAsync(
                 snapshot.ProviderReference,
@@ -281,7 +281,7 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         {
             if (payment.Status == PaymentStatus.Paid) return "AlreadyPaid";
             if (!PaymentRules.MatchesExpectedPayment(payment.Amount, payment.Currency, intent.AmountReceived, intent.Currency))
-                throw new InvalidOperationException("Stripe iznos ili valuta ne odgovaraju lokalnom plaćanju.");
+                throw new BusinessRuleException("Stripe iznos ili valuta ne odgovaraju lokalnom plaćanju.");
             payment.Status = PaymentStatus.Paid;
             payment.ChargedAmount = PaymentRules.FromMinorUnits(intent.AmountReceived);
             payment.PaidAtUtc = DateTime.UtcNow;

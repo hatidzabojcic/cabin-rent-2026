@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using CabinRent.Services.Payments;
+using CabinRent.Services.Exceptions;
 
 namespace CabinRent.API.Infrastructure;
 
@@ -12,6 +13,10 @@ public sealed class ApiExceptionHandler(
     {
         var status = exception switch
         {
+            RequestValidationException => StatusCodes.Status400BadRequest,
+            ResourceNotFoundException => StatusCodes.Status404NotFound,
+            BusinessRuleException => StatusCodes.Status409Conflict,
+            ForbiddenOperationException => StatusCodes.Status403Forbidden,
             ArgumentException => StatusCodes.Status400BadRequest,
             KeyNotFoundException => StatusCodes.Status404NotFound,
             InvalidOperationException => StatusCodes.Status409Conflict,

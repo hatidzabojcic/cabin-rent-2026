@@ -10,8 +10,8 @@ public sealed class CabinImageService(CabinRentDbContext dbContext, IImageStorag
     public async Task<CabinImageDto> AddAsync(int cabinId, Stream content, string extension, string? altText, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
     {
         var cabin = await ManagedCabin(cabinId, actorId, isAdmin).Include(x => x.Images).SingleOrDefaultAsync(cancellationToken)
-            ?? throw new KeyNotFoundException("Vikendica nije pronađena.");
-        if (cabin.Images.Count >= 12) throw new InvalidOperationException("Vikendica može imati najviše 12 slika.");
+            ?? throw new ResourceNotFoundException("Vikendica nije pronađena.");
+        if (cabin.Images.Count >= 12) throw new BusinessRuleException("Vikendica može imati najviše 12 slika.");
         var url = await storage.SaveAsync(cabinId, content, extension, cancellationToken);
         try
         {
@@ -41,7 +41,7 @@ public sealed class CabinImageService(CabinRentDbContext dbContext, IImageStorag
         if (request.IsCover)
             foreach (var item in cabin.Images) item.IsCover = item.Id == imageId;
         else if (image.IsCover && cabin.Images.Count > 1)
-            throw new InvalidOperationException("Prvo odaberite drugu naslovnu sliku.");
+            throw new BusinessRuleException("Prvo odaberite drugu naslovnu sliku.");
         image.AltText = string.IsNullOrWhiteSpace(request.AltText) ? cabin.Name : request.AltText.Trim();
         image.SortOrder = request.SortOrder;
         image.UpdatedAtUtc = DateTime.UtcNow;

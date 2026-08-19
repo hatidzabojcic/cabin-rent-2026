@@ -12,7 +12,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         var name = Required(request.Name, "Naziv drzave");
         var isoCode = Required(request.IsoCode, "ISO oznaka").ToUpperInvariant();
         if (await dbContext.Countries.AnyAsync(x => x.Name == name || x.IsoCode == isoCode, cancellationToken))
-            throw new InvalidOperationException("Drzava sa istim nazivom ili ISO oznakom vec postoji.");
+            throw new BusinessRuleException("Drzava sa istim nazivom ili ISO oznakom vec postoji.");
         var entity = new Country { Name = name, IsoCode = isoCode };
         dbContext.Countries.Add(entity);
         await SaveChangesAsync(cancellationToken);
@@ -26,7 +26,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         var name = Required(request.Name, "Naziv drzave");
         var isoCode = Required(request.IsoCode, "ISO oznaka").ToUpperInvariant();
         if (await dbContext.Countries.AnyAsync(x => x.Id != id && (x.Name == name || x.IsoCode == isoCode), cancellationToken))
-            throw new InvalidOperationException("Drzava sa istim nazivom ili ISO oznakom vec postoji.");
+            throw new BusinessRuleException("Drzava sa istim nazivom ili ISO oznakom vec postoji.");
         entity.Name = name;
         entity.IsoCode = isoCode;
         entity.UpdatedAtUtc = DateTime.UtcNow;
@@ -39,7 +39,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         var entity = await dbContext.Countries.FindAsync([id], cancellationToken);
         if (entity is null) return false;
         if (await dbContext.Cities.AnyAsync(x => x.CountryId == id, cancellationToken))
-            throw new InvalidOperationException("Drzavu nije moguce obrisati jer sadrzi gradove.");
+            throw new BusinessRuleException("Drzavu nije moguce obrisati jer sadrzi gradove.");
         dbContext.Countries.Remove(entity);
         await SaveChangesAsync(cancellationToken);
         return true;
@@ -48,10 +48,10 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     public async Task<CityDto> CreateCityAsync(SaveCityRequest request, CancellationToken cancellationToken = default)
     {
         var country = await dbContext.Countries.FindAsync([request.CountryId], cancellationToken)
-            ?? throw new KeyNotFoundException("Drzava nije pronadjena.");
+            ?? throw new ResourceNotFoundException("Drzava nije pronadjena.");
         var name = Required(request.Name, "Naziv grada");
         if (await dbContext.Cities.AnyAsync(x => x.CountryId == request.CountryId && x.Name == name, cancellationToken))
-            throw new InvalidOperationException("Grad sa istim nazivom vec postoji u odabranoj drzavi.");
+            throw new BusinessRuleException("Grad sa istim nazivom vec postoji u odabranoj drzavi.");
         var entity = new City { Name = name, PostalCode = Optional(request.PostalCode), CountryId = country.Id };
         dbContext.Cities.Add(entity);
         await SaveChangesAsync(cancellationToken);
@@ -63,10 +63,10 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         var entity = await dbContext.Cities.FindAsync([id], cancellationToken);
         if (entity is null) return null;
         var country = await dbContext.Countries.FindAsync([request.CountryId], cancellationToken)
-            ?? throw new KeyNotFoundException("Drzava nije pronadjena.");
+            ?? throw new ResourceNotFoundException("Drzava nije pronadjena.");
         var name = Required(request.Name, "Naziv grada");
         if (await dbContext.Cities.AnyAsync(x => x.Id != id && x.CountryId == request.CountryId && x.Name == name, cancellationToken))
-            throw new InvalidOperationException("Grad sa istim nazivom vec postoji u odabranoj drzavi.");
+            throw new BusinessRuleException("Grad sa istim nazivom vec postoji u odabranoj drzavi.");
         entity.Name = name;
         entity.PostalCode = Optional(request.PostalCode);
         entity.CountryId = request.CountryId;
@@ -80,7 +80,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         var entity = await dbContext.Cities.FindAsync([id], cancellationToken);
         if (entity is null) return false;
         if (await dbContext.Cabins.AnyAsync(x => x.CityId == id, cancellationToken))
-            throw new InvalidOperationException("Grad nije moguce obrisati jer ga koriste vikendice.");
+            throw new BusinessRuleException("Grad nije moguce obrisati jer ga koriste vikendice.");
         dbContext.Cities.Remove(entity);
         await SaveChangesAsync(cancellationToken);
         return true;
@@ -99,7 +99,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     public async Task<bool> DeleteCabinTypeAsync(int id, CancellationToken cancellationToken = default)
     {
         if (await dbContext.Cabins.AnyAsync(x => x.CabinTypeId == id, cancellationToken))
-            throw new InvalidOperationException("Tip nije moguce obrisati jer ga koriste vikendice.");
+            throw new BusinessRuleException("Tip nije moguce obrisati jer ga koriste vikendice.");
         return await DeleteEntityAsync<CabinType>(id, cancellationToken);
     }
 
@@ -116,7 +116,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     public async Task<bool> DeleteAmenityAsync(int id, CancellationToken cancellationToken = default)
     {
         if (await dbContext.Set<CabinAmenity>().AnyAsync(x => x.AmenityId == id, cancellationToken))
-            throw new InvalidOperationException("Pogodnost nije moguce obrisati jer je dodijeljena vikendicama.");
+            throw new BusinessRuleException("Pogodnost nije moguce obrisati jer je dodijeljena vikendicama.");
         return await DeleteEntityAsync<Amenity>(id, cancellationToken);
     }
 
@@ -133,7 +133,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     public async Task<bool> DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
     {
         if (await dbContext.Set<UserRole>().AnyAsync(x => x.RoleId == id, cancellationToken))
-            throw new InvalidOperationException("Ulogu nije moguce obrisati jer je dodijeljena korisnicima.");
+            throw new BusinessRuleException("Ulogu nije moguce obrisati jer je dodijeljena korisnicima.");
         return await DeleteEntityAsync<Role>(id, cancellationToken);
     }
 
@@ -143,7 +143,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     {
         var name = Required(value, "Naziv");
         if (await dbContext.Set<TEntity>().AnyAsync(x => EF.Property<string>(x, "Name") == name, cancellationToken))
-            throw new InvalidOperationException("Zapis sa istim nazivom vec postoji.");
+            throw new BusinessRuleException("Zapis sa istim nazivom vec postoji.");
         var entity = create(name, Optional(optional));
         dbContext.Add(entity);
         await SaveChangesAsync(cancellationToken);
@@ -158,7 +158,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         if (entity is null) return default;
         var name = Required(value, "Naziv");
         if (await dbContext.Set<TEntity>().AnyAsync(x => x.Id != id && EF.Property<string>(x, "Name") == name, cancellationToken))
-            throw new InvalidOperationException("Zapis sa istim nazivom vec postoji.");
+            throw new BusinessRuleException("Zapis sa istim nazivom vec postoji.");
         update(entity, name, Optional(optional));
         entity.UpdatedAtUtc = DateTime.UtcNow;
         await SaveChangesAsync(cancellationToken);
@@ -175,7 +175,7 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
     }
 
     private static string Required(string value, string field) =>
-        string.IsNullOrWhiteSpace(value) ? throw new ArgumentException($"{field} je obavezan.") : value.Trim();
+        string.IsNullOrWhiteSpace(value) ? throw new RequestValidationException($"{field} je obavezan.") : value.Trim();
 
     private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 

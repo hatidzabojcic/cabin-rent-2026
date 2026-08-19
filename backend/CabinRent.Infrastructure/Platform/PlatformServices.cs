@@ -114,7 +114,7 @@ public sealed class PlatformQueryService(
     public async Task<ManagedUserDto?> SetUserActiveAsync(int id, bool isActive, int actorId, CancellationToken cancellationToken = default)
     {
         if (!UserManagementRules.CanChangeStatus(id, isActive, actorId))
-            throw new InvalidOperationException("Ne možete deaktivirati vlastiti administratorski nalog.");
+            throw new BusinessRuleException("Ne možete deaktivirati vlastiti administratorski nalog.");
 
         var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null) return null;
@@ -132,13 +132,13 @@ public sealed class PlatformQueryService(
     public async Task<ManagedUserDto> CreateUserAsync(SaveManagedUserRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Password))
-            throw new ArgumentException("Lozinka je obavezna prilikom kreiranja korisnika.");
+            throw new RequestValidationException("Lozinka je obavezna prilikom kreiranja korisnika.");
         var email = request.Email.Trim().ToLowerInvariant();
         var userName = request.UserName.Trim();
         if (await dbContext.Users.AnyAsync(x => x.Email == email || x.UserName == userName, cancellationToken))
-            throw new InvalidOperationException("Email adresa ili korisnicko ime vec postoji.");
+            throw new BusinessRuleException("Email adresa ili korisnicko ime vec postoji.");
         var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
-            ?? throw new KeyNotFoundException("Uloga nije pronadjena.");
+            ?? throw new ResourceNotFoundException("Uloga nije pronadjena.");
         var user = new User
         {
             FirstName = request.FirstName.Trim(),
@@ -161,13 +161,13 @@ public sealed class PlatformQueryService(
         var user = await dbContext.Users.Include(x => x.UserRoles).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null) return null;
         if (id == actorId && !request.IsActive)
-            throw new InvalidOperationException("Ne mozete deaktivirati vlastiti administratorski nalog.");
+            throw new BusinessRuleException("Ne mozete deaktivirati vlastiti administratorski nalog.");
         var email = request.Email.Trim().ToLowerInvariant();
         var userName = request.UserName.Trim();
         if (await dbContext.Users.AnyAsync(x => x.Id != id && (x.Email == email || x.UserName == userName), cancellationToken))
-            throw new InvalidOperationException("Email adresa ili korisnicko ime vec postoji.");
+            throw new BusinessRuleException("Email adresa ili korisnicko ime vec postoji.");
         var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
-            ?? throw new KeyNotFoundException("Uloga nije pronadjena.");
+            ?? throw new ResourceNotFoundException("Uloga nije pronadjena.");
         user.FirstName = request.FirstName.Trim();
         user.LastName = request.LastName.Trim();
         user.Email = email;
@@ -190,7 +190,7 @@ public sealed class PlatformQueryService(
 
     public async Task<bool> DeleteUserAsync(int id, int actorId, CancellationToken cancellationToken = default)
     {
-        if (id == actorId) throw new InvalidOperationException("Ne mozete obrisati vlastiti administratorski nalog.");
+        if (id == actorId) throw new BusinessRuleException("Ne mozete obrisati vlastiti administratorski nalog.");
         var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null) return false;
         user.IsActive = false;
@@ -223,7 +223,7 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         if (!string.IsNullOrWhiteSpace(status))
         {
             if (!Enum.TryParse<ReservationStatus>(status, true, out var parsed))
-                throw new ArgumentException("Nepoznat status rezervacije.");
+                throw new RequestValidationException("Nepoznat status rezervacije.");
             query = query.Where(x => x.Status == parsed);
         }
         return query.OrderByDescending(x => x.CheckIn).Select(Projection())
@@ -235,21 +235,21 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
     public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, int guestId, CancellationToken cancellationToken = default)
     {
-        if (request.CheckOut <= request.CheckIn) throw new ArgumentException("Check-out mora biti nakon check-in datuma.");
+        if (request.CheckOut <= request.CheckIn) throw new RequestValidationException("Check-out mora biti nakon check-in datuma.");
         var cabin = await dbContext.Cabins.Where(CabinVisibilityRules.PubliclyVisible)
             .SingleOrDefaultAsync(x => x.Id == request.CabinId, cancellationToken)
-            ?? throw new KeyNotFoundException("Vikendica nije pronađena.");
+            ?? throw new ResourceNotFoundException("Vikendica nije pronađena.");
         if (!await dbContext.Users.AnyAsync(x => x.Id == guestId && x.IsActive, cancellationToken))
-            throw new KeyNotFoundException("Gost nije pronađen.");
+            throw new ResourceNotFoundException("Gost nije pronađen.");
         if (request.Adults + request.Children > cabin.MaxAdults + cabin.MaxChildren)
-            throw new ArgumentException("Broj gostiju prelazi kapacitet vikendice.");
+            throw new RequestValidationException("Broj gostiju prelazi kapacitet vikendice.");
 
         var overlaps = await dbContext.Reservations.AnyAsync(x => x.CabinId == request.CabinId &&
             x.Status != ReservationStatus.Cancelled && x.Status != ReservationStatus.Rejected &&
             request.CheckIn < x.CheckOut && request.CheckOut > x.CheckIn, cancellationToken);
         var blocked = await dbContext.AvailabilityBlocks.AnyAsync(x => x.CabinId == request.CabinId &&
             request.CheckIn < x.To && request.CheckOut > x.From, cancellationToken);
-        if (overlaps || blocked) throw new InvalidOperationException("Vikendica nije dostupna u odabranom terminu.");
+        if (overlaps || blocked) throw new BusinessRuleException("Vikendica nije dostupna u odabranom terminu.");
 
         var nights = request.CheckOut.DayNumber - request.CheckIn.DayNumber;
         var reservation = new Reservation
@@ -274,19 +274,19 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
     public async Task<ReservationDto?> UpdateStatusAsync(int id, UpdateReservationStatusRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
     {
         if (!Enum.TryParse<ReservationStatus>(request.Status, true, out var status))
-            throw new ArgumentException("Nepoznat status rezervacije.");
+            throw new RequestValidationException("Nepoznat status rezervacije.");
         var reason = request.Reason?.Trim();
         if (status == ReservationStatus.Rejected && string.IsNullOrWhiteSpace(reason))
-            throw new ArgumentException("Razlog odbijanja rezervacije je obavezan.");
+            throw new RequestValidationException("Razlog odbijanja rezervacije je obavezan.");
         var reservation = await dbContext.Reservations.Include(x => x.Cabin).Include(x => x.Payment)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (reservation is null) return null;
-        if (!isAdmin && reservation.Cabin.OwnerId != actorId) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
+        if (!isAdmin && reservation.Cabin.OwnerId != actorId) throw new ForbiddenOperationException("Nemate pristup ovoj rezervaciji.");
         if (reservation.Status == status) return await GetByIdAsync(id, cancellationToken);
         if (status == ReservationStatus.Cancelled && reservation.Payment?.Status == PaymentStatus.Paid)
-            throw new InvalidOperationException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
+            throw new BusinessRuleException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         if (!ReservationStatusRules.CanTransition(reservation.Status, status))
-            throw new InvalidOperationException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
+            throw new BusinessRuleException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
         reservation.Status = status;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
         reservation.StatusChangedByUserId = actorId;
@@ -306,10 +306,10 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
             .SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
         if (reservation is null) return null;
         if (!ReservationStatusRules.CanGuestCancel(reservation.Status, reservation.CheckIn, DateOnly.FromDateTime(DateTime.UtcNow)))
-            throw new InvalidOperationException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
+            throw new BusinessRuleException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
 
         if (reservation.Payment?.Status == PaymentStatus.Paid)
-            throw new InvalidOperationException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
+            throw new BusinessRuleException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
         reservation.StatusChangedByUserId = guestId;
@@ -326,10 +326,10 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
     public async Task<ReservationDto?> RescheduleAsync(int id, RescheduleReservationRequest request, int guestId, CancellationToken cancellationToken = default)
     {
         if (request.CheckOut <= request.CheckIn)
-            throw new ArgumentException("Datum odlaska mora biti nakon datuma dolaska.");
+            throw new RequestValidationException("Datum odlaska mora biti nakon datuma dolaska.");
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (request.CheckIn <= today)
-            throw new ArgumentException("Novi datum dolaska mora biti u budućnosti.");
+            throw new RequestValidationException("Novi datum dolaska mora biti u budućnosti.");
 
         var reservation = await dbContext.Reservations
             .Include(x => x.Cabin).ThenInclude(x => x.Owner)
@@ -337,9 +337,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
             .SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
         if (reservation is null) return null;
         if (!ReservationStatusRules.CanGuestReschedule(reservation.Status, reservation.CheckIn, today, reservation.Payment?.Status))
-            throw new InvalidOperationException("Termin je moguće promijeniti samo za buduću neplaćenu rezervaciju koja je na čekanju ili potvrđena.");
+            throw new BusinessRuleException("Termin je moguće promijeniti samo za buduću neplaćenu rezervaciju koja je na čekanju ili potvrđena.");
         if (!reservation.Cabin.IsActive || !reservation.Cabin.Owner.IsActive)
-            throw new InvalidOperationException("Vikendica trenutno nije dostupna za rezervaciju.");
+            throw new BusinessRuleException("Vikendica trenutno nije dostupna za rezervaciju.");
 
         var overlaps = await dbContext.Reservations.AnyAsync(x => x.Id != reservation.Id &&
             x.CabinId == reservation.CabinId &&
@@ -348,7 +348,7 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         var blocked = await dbContext.AvailabilityBlocks.AnyAsync(x => x.CabinId == reservation.CabinId &&
             request.CheckIn < x.To && request.CheckOut > x.From, cancellationToken);
         if (overlaps || blocked)
-            throw new InvalidOperationException("Vikendica nije dostupna u odabranom terminu.");
+            throw new BusinessRuleException("Vikendica nije dostupna u odabranom terminu.");
 
         var nights = request.CheckOut.DayNumber - request.CheckIn.DayNumber;
         var totalPrice = reservation.Cabin.PricePerNight * nights;
@@ -433,7 +433,7 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
 
     public Task<PagedResult<ReviewDto>> GetManagedAsync(PageRequest paging, int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default)
     {
-        if (rating is < 1 or > 5) throw new ArgumentException("Ocjena mora biti između 1 i 5.");
+        if (rating is < 1 or > 5) throw new RequestValidationException("Ocjena mora biti između 1 i 5.");
         var query = dbContext.Reviews.AsNoTracking().AsQueryable();
         if (ownerId.HasValue) query = query.Where(x => x.Cabin.OwnerId == ownerId);
         if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
@@ -452,10 +452,10 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
     public async Task<ReviewDto> CreateAsync(CreateReviewRequest request, int guestId, CancellationToken cancellationToken = default)
     {
         var reservation = await dbContext.Reservations.Include(x => x.Review).Include(x => x.Cabin).SingleOrDefaultAsync(x => x.Id == request.ReservationId, cancellationToken)
-            ?? throw new KeyNotFoundException("Rezervacija nije pronađena.");
-        if (reservation.Status != ReservationStatus.Completed) throw new InvalidOperationException("Recenzija je dozvoljena tek nakon završenog boravka.");
-        if (reservation.GuestId != guestId) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
-        if (reservation.Review is not null) throw new InvalidOperationException("Rezervacija već ima recenziju.");
+            ?? throw new ResourceNotFoundException("Rezervacija nije pronađena.");
+        if (reservation.Status != ReservationStatus.Completed) throw new BusinessRuleException("Recenzija je dozvoljena tek nakon završenog boravka.");
+        if (reservation.GuestId != guestId) throw new ForbiddenOperationException("Nemate pristup ovoj rezervaciji.");
+        if (reservation.Review is not null) throw new BusinessRuleException("Rezervacija već ima recenziju.");
         var review = new Review { Reservation = reservation, CabinId = reservation.CabinId, GuestId = reservation.GuestId, Rating = request.Rating, Comment = request.Comment, IsApproved = false };
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         dbContext.Reviews.Add(review);
@@ -474,7 +474,7 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         var review = await dbContext.Reviews.Include(x => x.Cabin).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (review is null) return null;
         if (!ReviewModerationRules.CanManage(isAdmin, review.Cabin.OwnerId, actorId))
-            throw new UnauthorizedAccessException("Nemate pristup ovoj recenziji.");
+            throw new ForbiddenOperationException("Nemate pristup ovoj recenziji.");
         review.IsApproved = isApproved;
         review.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -498,7 +498,7 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         var review = await dbContext.Reviews.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (review is null) return false;
         if (!isAdmin && review.GuestId != actorId)
-            throw new UnauthorizedAccessException("Nemate pristup ovoj recenziji.");
+            throw new ForbiddenOperationException("Nemate pristup ovoj recenziji.");
         dbContext.Reviews.Remove(review);
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
@@ -522,7 +522,7 @@ public sealed class FavoriteService(CabinRentDbContext dbContext) : IFavoriteSer
     {
         if (!await dbContext.Users.AnyAsync(x => x.Id == userId && x.IsActive, cancellationToken)
             || !await dbContext.Cabins.Where(CabinVisibilityRules.PubliclyVisible).AnyAsync(x => x.Id == request.CabinId, cancellationToken))
-            throw new KeyNotFoundException("Korisnik ili vikendica nije pronađena.");
+            throw new ResourceNotFoundException("Korisnik ili vikendica nije pronađena.");
         var existing = await dbContext.Favorites.FindAsync([userId, request.CabinId], cancellationToken);
         if (existing is null)
         {

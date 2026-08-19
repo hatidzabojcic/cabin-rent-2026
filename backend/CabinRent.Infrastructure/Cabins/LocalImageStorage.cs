@@ -31,7 +31,7 @@ public sealed class LocalImageStorage(string rootPath) : IImageStorage
         var relative = url[prefix.Length..].Replace('/', Path.DirectorySeparatorChar);
         var path = Path.GetFullPath(Path.Combine(_rootPath, relative));
         if (!path.StartsWith(_rootPath, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Putanja slike nije validna.");
+            throw new BusinessRuleException("Putanja slike nije validna.");
         if (File.Exists(path)) File.Delete(path);
         return Task.CompletedTask;
     }

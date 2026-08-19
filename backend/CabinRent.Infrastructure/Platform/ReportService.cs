@@ -9,7 +9,7 @@ public sealed class ReportService(CabinRentDbContext dbContext) : IReportService
 {
     public async Task<AnnualReportDto> GetAnnualAsync(int year, int? ownerId, int? cabinId, CancellationToken cancellationToken = default)
     {
-        if (!ReportRules.IsValidYear(year)) throw new ArgumentException("Godina mora biti između 2000. i 2100.");
+        if (!ReportRules.IsValidYear(year)) throw new RequestValidationException("Godina mora biti između 2000. i 2100.");
 
         var cabinsQuery = dbContext.Cabins.AsNoTracking().AsQueryable();
         if (ownerId.HasValue) cabinsQuery = cabinsQuery.Where(x => x.OwnerId == ownerId);
@@ -48,9 +48,9 @@ public sealed class ReportService(CabinRentDbContext dbContext) : IReportService
     public async Task<TopGuestsReportDto> GetTopGuestsAsync(
         int year, int? cabinId, int limit, CancellationToken cancellationToken = default)
     {
-        if (!ReportRules.IsValidYear(year)) throw new ArgumentException("Godina mora biti između 2000. i 2100.");
+        if (!ReportRules.IsValidYear(year)) throw new RequestValidationException("Godina mora biti između 2000. i 2100.");
         if (cabinId.HasValue && !await dbContext.Cabins.AnyAsync(x => x.Id == cabinId.Value, cancellationToken))
-            throw new KeyNotFoundException("Vikendica nije pronađena.");
+            throw new ResourceNotFoundException("Vikendica nije pronađena.");
 
         var query = dbContext.Reservations.AsNoTracking()
             .Where(x => x.CheckIn.Year == year

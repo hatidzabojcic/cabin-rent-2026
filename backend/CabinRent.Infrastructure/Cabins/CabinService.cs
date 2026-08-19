@@ -129,14 +129,14 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
     private async Task ValidateReferencesAsync(SaveCabinRequest request, int ownerId, CancellationToken cancellationToken)
     {
         if (!await dbContext.Users.AnyAsync(x => x.Id == ownerId && x.IsActive && x.UserRoles.Any(r => r.Role.Name == "Owner"), cancellationToken))
-            throw new ArgumentException("Odabrani vlasnik nije validan Owner korisnik.");
+            throw new RequestValidationException("Odabrani vlasnik nije validan Owner korisnik.");
         if (!await dbContext.Cities.AnyAsync(x => x.Id == request.CityId, cancellationToken))
-            throw new ArgumentException("Odabrani grad ne postoji.");
+            throw new RequestValidationException("Odabrani grad ne postoji.");
         if (!await dbContext.CabinTypes.AnyAsync(x => x.Id == request.CabinTypeId, cancellationToken))
-            throw new ArgumentException("Odabrani tip vikendice ne postoji.");
+            throw new RequestValidationException("Odabrani tip vikendice ne postoji.");
         var amenityIds = request.AmenityIds.Distinct().ToArray();
         if (amenityIds.Length != await dbContext.Amenities.CountAsync(x => amenityIds.Contains(x.Id), cancellationToken))
-            throw new ArgumentException("Jedna ili više odabranih pogodnosti ne postoje.");
+            throw new RequestValidationException("Jedna ili više odabranih pogodnosti ne postoje.");
     }
 
     private static void ApplyRelations(Cabin cabin, SaveCabinRequest request)

@@ -30,9 +30,9 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         var userName = request.UserName.Trim().ToLowerInvariant();
         var email = request.Email.Trim().ToLowerInvariant();
         if (await dbContext.Users.AnyAsync(x => x.UserName == userName, cancellationToken))
-            throw new InvalidOperationException("Korisničko ime je već zauzeto.");
+            throw new BusinessRuleException("Korisničko ime je već zauzeto.");
         if (await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
-            throw new InvalidOperationException("Email adresa je već registrovana.");
+            throw new BusinessRuleException("Email adresa je već registrovana.");
 
         var guestRole = await dbContext.Roles.SingleAsync(x => x.Name == "Guest", cancellationToken);
         var user = new User
@@ -81,10 +81,20 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
     public async Task<bool> LogoutAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken = default)
     {
         var hash = HashToken(refreshToken);
-        var stored = await dbContext.RefreshTokens.SingleOrDefaultAsync(x => x.TokenHash == hash, cancellationToken);
+        var stored = await dbContext.RefreshTokens.Include(x => x.User)
+            .SingleOrDefaultAsync(x => x.TokenHash == hash, cancellationToken);
         if (stored is null || stored.RevokedAtUtc.HasValue) return false;
-        stored.RevokedAtUtc = DateTime.UtcNow;
-        stored.RevokedByIp = ipAddress;
+        var now = DateTime.UtcNow;
+        var activeTokens = await dbContext.RefreshTokens
+            .Where(x => x.UserId == stored.UserId && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var token in activeTokens)
+        {
+            token.RevokedAtUtc = now;
+            token.RevokedByIp = ipAddress;
+        }
+        stored.User.TokenVersion++;
+        stored.User.UpdatedAtUtc = now;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -98,13 +108,13 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
     public async Task<UserDto?> UpdateProfileAsync(int userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
-            throw new ArgumentException("Ime i prezime su obavezni.");
+            throw new RequestValidationException("Ime i prezime su obavezni.");
         var user = await UserQuery().SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
         if (user is null) return null;
 
         var email = request.Email.Trim().ToLowerInvariant();
         if (await dbContext.Users.AnyAsync(x => x.Id != userId && x.Email == email, cancellationToken))
-            throw new InvalidOperationException("Email adresa je već registrovana.");
+            throw new BusinessRuleException("Email adresa je već registrovana.");
 
         user.FirstName = request.FirstName.Trim();
         user.LastName = request.LastName.Trim();
@@ -147,7 +157,7 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         var hasActiveReservations = await dbContext.Reservations
             .AnyAsync(ProfileDeletionRules.BlockingReservationFor(userId), cancellationToken);
         if (hasActiveReservations)
-            throw new InvalidOperationException("Profil nije moguće obrisati dok imate rezervacije na čekanju ili potvrđene rezervacije.");
+            throw new BusinessRuleException("Profil nije moguće obrisati dok imate rezervacije na čekanju ili potvrđene rezervacije.");
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTime.UtcNow;
@@ -183,11 +193,12 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
             .SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
         if (user is null) return false;
         if (!PasswordHash.Verify(request.CurrentPassword, user.PasswordHash))
-            throw new InvalidOperationException("Trenutna lozinka nije ispravna.");
+            throw new BusinessRuleException("Trenutna lozinka nije ispravna.");
         if (PasswordHash.Verify(request.NewPassword, user.PasswordHash))
-            throw new InvalidOperationException("Nova lozinka mora biti razlicita od trenutne.");
+            throw new BusinessRuleException("Nova lozinka mora biti razlicita od trenutne.");
         user.PasswordHash = PasswordHash.Create(request.NewPassword);
         user.UpdatedAtUtc = DateTime.UtcNow;
+        user.TokenVersion++;
         foreach (var token in user.RefreshTokens.Where(x => x.RevokedAtUtc == null))
             token.RevokedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -214,7 +225,8 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, user.UserName),
             new(JwtRegisteredClaimNames.Email, user.Email),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("token_version", user.TokenVersion.ToString())
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)), SecurityAlgorithms.HmacSha256);

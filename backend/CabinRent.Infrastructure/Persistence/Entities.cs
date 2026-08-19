@@ -17,6 +17,7 @@ public sealed class User : Entity
     public string? PhoneNumber { get; set; }
     public string? ProfileImageUrl { get; set; }
     public bool IsActive { get; set; } = true;
+    public int TokenVersion { get; set; }
     public DateTime? DeletedAtUtc { get; set; }
     public ICollection<UserRole> UserRoles { get; set; } = [];
     public ICollection<Cabin> OwnedCabins { get; set; } = [];
