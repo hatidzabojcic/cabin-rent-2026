@@ -53,11 +53,12 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
             .Select(DetailsProjection())
             .SingleOrDefaultAsync(cancellationToken);
 
-    public async Task<IReadOnlyCollection<CabinDetailsDto>> GetManagedAsync(int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    public Task<PagedResult<CabinDetailsDto>> GetManagedAsync(PageRequest paging, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Cabins.AsNoTracking().AsQueryable();
         if (!isAdmin) query = query.Where(x => x.OwnerId == actorId);
-        return await query.OrderBy(x => x.Name).Select(DetailsProjection()).ToListAsync(cancellationToken);
+        return query.OrderBy(x => x.Name).Select(DetailsProjection())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
     public Task<CabinDetailsDto?> GetManagedByIdAsync(int id, int actorId, bool isAdmin, CancellationToken cancellationToken = default) =>
@@ -110,6 +111,16 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
         cabin.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return await GetManagedByIdAsync(id, actorId, isAdmin, cancellationToken);
+    }
+
+    public async Task<bool> DeleteAsync(int id, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var cabin = await ManagedQuery(id, actorId, isAdmin).SingleOrDefaultAsync(cancellationToken);
+        if (cabin is null) return false;
+        cabin.IsActive = false;
+        cabin.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private IQueryable<Cabin> ManagedQuery(int id, int actorId, bool isAdmin) =>

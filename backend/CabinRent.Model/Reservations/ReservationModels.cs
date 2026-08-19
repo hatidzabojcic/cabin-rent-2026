@@ -8,7 +8,10 @@ public sealed record ReservationDto(
     DateOnly CheckIn, DateOnly CheckOut, int Adults, int Children, decimal PricePerNight,
     decimal TotalPrice, string Status, string? SpecialRequests, string? PaymentStatus,
     decimal PaidAmount, string? PaymentCurrency, DateTime? PaidAtUtc,
-    decimal RefundedAmount, DateTime? RefundedAtUtc, DateTime CreatedAtUtc);
+    decimal RefundedAmount, DateTime? RefundedAtUtc,
+    int? StatusChangedByUserId, string? StatusChangedByUserName,
+    DateTime? StatusChangedAtUtc, string? StatusChangeReason,
+    DateTime CreatedAtUtc);
 
 public sealed class CreateReservationRequest
 {
@@ -23,6 +26,7 @@ public sealed class CreateReservationRequest
 public sealed class UpdateReservationStatusRequest
 {
     [Required] public required string Status { get; init; }
+    [MaxLength(500)] public string? Reason { get; init; }
 }
 
 public sealed class RescheduleReservationRequest

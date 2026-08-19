@@ -3,6 +3,7 @@ using CabinRent.Model.Notifications;
 using CabinRent.Services.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CabinRent.Model.Common;
 
 namespace CabinRent.API.Controllers;
 
@@ -12,8 +13,8 @@ namespace CabinRent.API.Controllers;
 public sealed class NotificationsController(INotificationService service) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<NotificationDto>> Get([FromQuery] bool? isRead, CancellationToken cancellationToken) =>
-        service.GetAsync(User.GetUserId(), isRead, cancellationToken);
+    public Task<PagedResult<NotificationDto>> Get([FromQuery] PageRequest paging, [FromQuery] bool? isRead, CancellationToken cancellationToken) =>
+        service.GetAsync(paging, User.GetUserId(), isRead, cancellationToken);
 
     [HttpGet("summary")]
     public async Task<NotificationSummaryDto> Summary(CancellationToken cancellationToken) =>

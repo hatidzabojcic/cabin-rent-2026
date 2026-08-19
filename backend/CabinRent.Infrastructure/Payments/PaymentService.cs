@@ -189,6 +189,11 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
             return true;
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangedByUserId = actorId;
+        reservation.StatusChangedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangeReason = refund is null
+            ? "Rezervacija je otkazana."
+            : "Rezervacija je otkazana i izvršen je povrat sredstava.";
         if (refund is not null && reservation.Payment is not null)
         {
             reservation.Payment.Status = PaymentStatus.Refunded;

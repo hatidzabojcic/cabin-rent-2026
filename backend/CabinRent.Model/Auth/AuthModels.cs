@@ -28,5 +28,11 @@ public sealed class RefreshRequest
     [Required] public required string RefreshToken { get; init; }
 }
 
+public sealed class ChangePasswordRequest
+{
+    [Required, MaxLength(200)] public required string CurrentPassword { get; init; }
+    [Required, MinLength(8), MaxLength(200)] public required string NewPassword { get; init; }
+}
+
 public sealed record AuthResponse(
     string AccessToken, string RefreshToken, DateTime ExpiresAtUtc, UserDto User);

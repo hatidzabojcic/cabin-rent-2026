@@ -4,7 +4,9 @@ using CabinRent.Services.Payments;
 
 namespace CabinRent.API.Infrastructure;
 
-public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
+public sealed class ApiExceptionHandler(
+    IProblemDetailsService problemDetailsService,
+    ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -19,6 +21,12 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             InvalidPaymentWebhookException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
+        if (status >= StatusCodes.Status500InternalServerError)
+            logger.LogError(exception, "Unhandled API error for {Method} {Path}. TraceId: {TraceId}",
+                httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
+        else
+            logger.LogWarning(exception, "API request rejected with status {Status} for {Method} {Path}. TraceId: {TraceId}",
+                status, httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
         httpContext.Response.StatusCode = status;
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {

@@ -14,6 +14,19 @@ public sealed record ManagedUserDto(
 
 public sealed record UpdateUserStatusRequest(bool IsActive);
 
+public sealed class SaveManagedUserRequest
+{
+    [Required, MaxLength(100)] public required string FirstName { get; init; }
+    [Required, MaxLength(100)] public required string LastName { get; init; }
+    [Required, EmailAddress, MaxLength(320)] public required string Email { get; init; }
+    [Required, MinLength(3), MaxLength(100)] public required string UserName { get; init; }
+    [MinLength(8), MaxLength(200)] public string? Password { get; init; }
+    [RegularExpression(@"^\+3876[0-7]\d{6}$", ErrorMessage = "Broj telefona mora biti BiH mobilni broj u formatu +3876XXXXXXX.")]
+    [MaxLength(12)] public string? PhoneNumber { get; init; }
+    [Required] public required string Role { get; init; }
+    public bool IsActive { get; init; } = true;
+}
+
 public sealed class UpdateProfileRequest
 {
     [Required, MaxLength(100)] public required string FirstName { get; init; }

@@ -2,16 +2,18 @@ using CabinRent.Infrastructure.Persistence;
 using CabinRent.Model.Notifications;
 using CabinRent.Services.Notifications;
 using Microsoft.EntityFrameworkCore;
+using CabinRent.Model.Common;
 
 namespace CabinRent.Infrastructure.Notifications;
 
 public sealed class NotificationService(CabinRentDbContext dbContext) : INotificationService
 {
-    public async Task<IReadOnlyCollection<NotificationDto>> GetAsync(int userId, bool? isRead, CancellationToken cancellationToken = default)
+    public Task<PagedResult<NotificationDto>> GetAsync(PageRequest paging, int userId, bool? isRead, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Notifications.AsNoTracking().Where(x => x.UserId == userId);
         if (isRead.HasValue) query = query.Where(x => x.IsRead == isRead.Value);
-        return await query.OrderByDescending(x => x.CreatedAtUtc).Take(100).Select(ToDto()).ToListAsync(cancellationToken);
+        return query.OrderByDescending(x => x.CreatedAtUtc).Select(ToDto())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
     public Task<int> GetUnreadCountAsync(int userId, CancellationToken cancellationToken = default) =>

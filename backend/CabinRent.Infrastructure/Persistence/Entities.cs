@@ -130,6 +130,10 @@ public sealed class Reservation : Entity
     public User Guest { get; set; } = null!;
     public int CabinId { get; set; }
     public Cabin Cabin { get; set; } = null!;
+    public int? StatusChangedByUserId { get; set; }
+    public User? StatusChangedByUser { get; set; }
+    public DateTime? StatusChangedAtUtc { get; set; }
+    public string? StatusChangeReason { get; set; }
     public Payment? Payment { get; set; }
     public Review? Review { get; set; }
 }

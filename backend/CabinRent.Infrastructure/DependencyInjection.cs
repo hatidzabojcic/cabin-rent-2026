@@ -43,7 +43,10 @@ public static class DependencyInjection
         var imageRoot = configuration["ImageStorage:RootPath"] ?? Path.Combine(AppContext.BaseDirectory, "uploads");
         services.AddSingleton<IImageStorage>(new LocalImageStorage(imageRoot));
         services.AddScoped<ICabinImageService, CabinImageService>();
+        services.AddMemoryCache();
+        services.AddSingleton<ReferenceDataCacheState>();
         services.AddScoped<IPlatformQueryService, PlatformQueryService>();
+        services.AddScoped<IReferenceDataService, ReferenceDataService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IFavoriteService, FavoriteService>();

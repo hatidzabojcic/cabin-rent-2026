@@ -74,6 +74,8 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         if (!CabinImageRules.IsSupported(extension, file.ContentType))
             return BadRequest("Dozvoljeni formati su JPG, PNG i WebP.");
         await using var stream = file.OpenReadStream();
+        if (!await CabinImageRules.HasValidSignatureAsync(stream, extension, cancellationToken))
+            return BadRequest("Sadrzaj datoteke ne odgovara odabranom formatu slike.");
         var user = await authService.UpdateProfileImageAsync(User.GetUserId(), stream, extension, cancellationToken);
         return user is null ? NotFound() : Ok(user);
     }
@@ -82,6 +84,11 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     [HttpDelete("me")]
     public async Task<IActionResult> DeactivateMe(CancellationToken cancellationToken) =>
         await authService.DeactivateProfileAsync(User.GetUserId(), ClientIp(), cancellationToken) ? NoContent() : NotFound();
+
+    [Authorize]
+    [HttpPut("me/password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken) =>
+        await authService.ChangePasswordAsync(User.GetUserId(), request, cancellationToken) ? NoContent() : NotFound();
 
     private string? ClientIp() => HttpContext.Connection.RemoteIpAddress?.ToString();
 }

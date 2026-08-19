@@ -13,4 +13,5 @@ public interface IAuthService
     Task<UserDto?> UpdateProfileAsync(int userId, UpdateProfileRequest request, CancellationToken cancellationToken = default);
     Task<UserDto?> UpdateProfileImageAsync(int userId, Stream content, string extension, CancellationToken cancellationToken = default);
     Task<bool> DeactivateProfileAsync(int userId, string? ipAddress, CancellationToken cancellationToken = default);
+    Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
 }

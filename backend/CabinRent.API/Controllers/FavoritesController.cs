@@ -3,6 +3,7 @@ using CabinRent.Services.Platform;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using CabinRent.API.Infrastructure;
+using CabinRent.Model.Common;
 
 namespace CabinRent.API.Controllers;
 
@@ -12,8 +13,8 @@ namespace CabinRent.API.Controllers;
 public sealed class FavoritesController(IFavoriteService service) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<FavoriteDto>> Get(CancellationToken cancellationToken) =>
-        service.GetAsync(User.GetUserId(), cancellationToken);
+    public Task<PagedResult<FavoriteDto>> Get([FromQuery] PageRequest paging, CancellationToken cancellationToken) =>
+        service.GetAsync(paging, User.GetUserId(), cancellationToken);
 
     [HttpPost]
     [ProducesResponseType<FavoriteDto>(StatusCodes.Status201Created)]

@@ -1,9 +1,10 @@
 using CabinRent.Model.Recommendations;
+using CabinRent.Model.Common;
 
 namespace CabinRent.Services.Recommendations;
 
 public interface IRecommendationService
 {
-    Task<IReadOnlyCollection<RecommendationDto>> GetAsync(
-        int userId, int limit, CancellationToken cancellationToken = default);
+    Task<PagedResult<RecommendationDto>> GetAsync(
+        int userId, PageRequest paging, CancellationToken cancellationToken = default);
 }

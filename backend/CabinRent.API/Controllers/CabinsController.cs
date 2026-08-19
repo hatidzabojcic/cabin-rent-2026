@@ -28,8 +28,8 @@ public sealed class CabinsController(ICabinService cabinService, ICabinImageServ
 
     [HttpGet("manage")]
     [Authorize(Roles = "Admin,Owner")]
-    public Task<IReadOnlyCollection<CabinDetailsDto>> GetManaged(CancellationToken cancellationToken) =>
-        cabinService.GetManagedAsync(User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
+    public Task<PagedResult<CabinDetailsDto>> GetManaged([FromQuery] PageRequest paging, CancellationToken cancellationToken) =>
+        cabinService.GetManagedAsync(paging, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
 
     [HttpGet("manage/{id:int}")]
     [Authorize(Roles = "Admin,Owner")]
@@ -76,6 +76,8 @@ public sealed class CabinsController(ICabinService cabinService, ICabinImageServ
         if (!CabinImageRules.IsSupported(extension, file.ContentType))
             return BadRequest("Dozvoljeni formati su JPG, PNG i WebP.");
         await using var stream = file.OpenReadStream();
+        if (!await CabinImageRules.HasValidSignatureAsync(stream, extension, cancellationToken))
+            return BadRequest("Sadrzaj datoteke ne odgovara odabranom formatu slike.");
         var image = await imageService.AddAsync(id, stream, extension, altText, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
         return StatusCode(StatusCodes.Status201Created, image);
     }
@@ -92,4 +94,9 @@ public sealed class CabinsController(ICabinService cabinService, ICabinImageServ
     [Authorize(Roles = "Admin,Owner")]
     public async Task<IActionResult> DeleteImage(int id, int imageId, CancellationToken cancellationToken) =>
         await imageService.DeleteAsync(id, imageId, User.GetUserId(), User.IsInRole("Admin"), cancellationToken) ? NoContent() : NotFound();
+
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin,Owner")]
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken) =>
+        await cabinService.DeleteAsync(id, User.GetUserId(), User.IsInRole("Admin"), cancellationToken) ? NoContent() : NotFound();
 }

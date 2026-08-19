@@ -177,6 +177,23 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         return true;
     }
 
+    public async Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.Include(x => x.RefreshTokens)
+            .SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, cancellationToken);
+        if (user is null) return false;
+        if (!PasswordHash.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new InvalidOperationException("Trenutna lozinka nije ispravna.");
+        if (PasswordHash.Verify(request.NewPassword, user.PasswordHash))
+            throw new InvalidOperationException("Nova lozinka mora biti razlicita od trenutne.");
+        user.PasswordHash = PasswordHash.Create(request.NewPassword);
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        foreach (var token in user.RefreshTokens.Where(x => x.RevokedAtUtc == null))
+            token.RevokedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private async Task<AuthResponse> CreateSessionAsync(User user, string? ipAddress, CancellationToken cancellationToken)
     {
         var rawRefreshToken = GenerateRefreshToken();

@@ -82,6 +82,10 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<Reservation>()
             .HasOne(x => x.Guest).WithMany()
             .HasForeignKey(x => x.GuestId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Reservation>()
+            .HasOne(x => x.StatusChangedByUser).WithMany()
+            .HasForeignKey(x => x.StatusChangedByUserId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Reservation>().Property(x => x.StatusChangeReason).HasMaxLength(500);
         modelBuilder.Entity<Review>()
             .HasOne(x => x.Guest).WithMany()
             .HasForeignKey(x => x.GuestId).OnDelete(DeleteBehavior.Restrict);

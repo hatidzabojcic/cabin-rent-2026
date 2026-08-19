@@ -3,15 +3,17 @@ using CabinRent.Model.Recommendations;
 using CabinRent.Services.Recommendations;
 using Microsoft.EntityFrameworkCore;
 using CabinRent.Infrastructure.Cabins;
+using CabinRent.Model.Common;
 
 namespace CabinRent.Infrastructure.Recommendations;
 
 public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecommendationService
 {
-    public async Task<IReadOnlyCollection<RecommendationDto>> GetAsync(
-        int userId, int limit, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<RecommendationDto>> GetAsync(
+        int userId, PageRequest paging, CancellationToken cancellationToken = default)
     {
-        var resultLimit = Math.Clamp(limit, 1, 20);
+        var page = Math.Max(paging.Page, 1);
+        var pageSize = Math.Clamp(paging.PageSize, 1, 20);
         var preferences = await dbContext.Cabins.AsNoTracking()
             .Where(cabin =>
                 cabin.Reservations.Any(reservation => reservation.GuestId == userId
@@ -105,9 +107,12 @@ public sealed class RecommendationService(CabinRentDbContext dbContext) : IRecom
             ? rankedCandidates.Where(x => cabinsWithActivity.Contains(x.CabinId))
             : rankedCandidates;
 
-        return recommendations
-            .Take(resultLimit)
-            .ToList();
+        var materialized = recommendations.ToList();
+        return new PagedResult<RecommendationDto>(
+            materialized.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
+            materialized.Count,
+            page,
+            pageSize);
     }
 
     private sealed record Candidate(

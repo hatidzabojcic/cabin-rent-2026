@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using CabinRent.API.Infrastructure;
 using CabinRent.Services.Payments;
+using CabinRent.Model.Common;
 
 namespace CabinRent.API.Controllers;
 
@@ -13,12 +14,12 @@ namespace CabinRent.API.Controllers;
 public sealed class ReservationsController(IReservationService service, IPaymentService paymentService) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<ReservationDto>> Get([FromQuery] int? cabinId, [FromQuery] string? status, CancellationToken cancellationToken)
+    public Task<PagedResult<ReservationDto>> Get([FromQuery] PageRequest paging, [FromQuery] int? cabinId, [FromQuery] string? status, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         var isAdmin = User.IsInRole("Admin");
         var isOwner = User.IsInRole("Owner");
-        return service.GetAsync(isAdmin || isOwner ? null : userId, isAdmin ? null : isOwner ? userId : null, cabinId, status, cancellationToken);
+        return service.GetAsync(paging, isAdmin || isOwner ? null : userId, isAdmin ? null : isOwner ? userId : null, cabinId, status, cancellationToken);
     }
 
     [HttpGet("{id:int}")]

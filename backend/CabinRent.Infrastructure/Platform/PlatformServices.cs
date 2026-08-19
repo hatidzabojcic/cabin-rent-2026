@@ -9,49 +9,95 @@ using CabinRent.Services.Platform;
 using CabinRent.Infrastructure.Cabins;
 using CabinRent.Model.Notifications;
 using Microsoft.EntityFrameworkCore;
+using CabinRent.Model.Common;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CabinRent.Infrastructure.Platform;
 
-public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatformQueryService
+public sealed class PlatformQueryService(
+    CabinRentDbContext dbContext,
+    IMemoryCache memoryCache,
+    ReferenceDataCacheState cacheState) : IPlatformQueryService
 {
-    public async Task<IReadOnlyCollection<CountryDto>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Countries.AsNoTracking().OrderBy(x => x.Name)
-            .Select(x => new CountryDto(x.Id, x.Name, x.IsoCode)).ToListAsync(cancellationToken);
-
-    public async Task<IReadOnlyCollection<CityDto>> GetCitiesAsync(int? countryId, string? search, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<CountryDto>> GetCountriesAsync(PageRequest paging, string? search, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Cities.AsNoTracking().AsQueryable();
-        if (countryId.HasValue) query = query.Where(x => x.CountryId == countryId);
-        if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
-        return await query.OrderBy(x => x.Name)
-            .Select(x => new CityDto(x.Id, x.Name, x.PostalCode, x.CountryId, x.Country.Name)).ToListAsync(cancellationToken);
+        return (await memoryCache.GetOrCreateAsync(CacheKey("countries", paging, search), async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            var query = dbContext.Countries.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search) || x.IsoCode.Contains(search));
+            return await query.OrderBy(x => x.Name).Select(x => new CountryDto(x.Id, x.Name, x.IsoCode))
+                .ToPagedResultAsync(paging, cancellationToken);
+        }))!;
     }
 
-    public async Task<IReadOnlyCollection<CabinTypeDto>> GetCabinTypesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.CabinTypes.AsNoTracking().OrderBy(x => x.Name)
-            .Select(x => new CabinTypeDto(x.Id, x.Name, x.Description)).ToListAsync(cancellationToken);
+    public async Task<PagedResult<CityDto>> GetCitiesAsync(PageRequest paging, int? countryId, string? search, CancellationToken cancellationToken = default)
+    {
+        return (await memoryCache.GetOrCreateAsync($"{CacheKey("cities", paging, search)}:{countryId}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            var query = dbContext.Cities.AsNoTracking().AsQueryable();
+            if (countryId.HasValue) query = query.Where(x => x.CountryId == countryId);
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
+            return await query.OrderBy(x => x.Name)
+                .Select(x => new CityDto(x.Id, x.Name, x.PostalCode, x.CountryId, x.Country.Name))
+                .ToPagedResultAsync(paging, cancellationToken);
+        }))!;
+    }
 
-    public async Task<IReadOnlyCollection<AmenityDto>> GetAmenitiesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Amenities.AsNoTracking().OrderBy(x => x.Name)
-            .Select(x => new AmenityDto(x.Id, x.Name, x.Icon)).ToListAsync(cancellationToken);
+    public async Task<PagedResult<CabinTypeDto>> GetCabinTypesAsync(PageRequest paging, string? search, CancellationToken cancellationToken = default)
+    {
+        return (await memoryCache.GetOrCreateAsync(CacheKey("cabin-types", paging, search), async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            var query = dbContext.CabinTypes.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
+            return await query.OrderBy(x => x.Name).Select(x => new CabinTypeDto(x.Id, x.Name, x.Description))
+                .ToPagedResultAsync(paging, cancellationToken);
+        }))!;
+    }
 
-    public async Task<IReadOnlyCollection<RoleDto>> GetRolesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Roles.AsNoTracking().OrderBy(x => x.Name)
-            .Select(x => new RoleDto(x.Id, x.Name, x.Description)).ToListAsync(cancellationToken);
+    public async Task<PagedResult<AmenityDto>> GetAmenitiesAsync(PageRequest paging, string? search, CancellationToken cancellationToken = default)
+    {
+        return (await memoryCache.GetOrCreateAsync(CacheKey("amenities", paging, search), async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            var query = dbContext.Amenities.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
+            return await query.OrderBy(x => x.Name).Select(x => new AmenityDto(x.Id, x.Name, x.Icon))
+                .ToPagedResultAsync(paging, cancellationToken);
+        }))!;
+    }
 
-    public async Task<IReadOnlyCollection<UserDto>> GetUsersAsync(string? search, string? role, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<RoleDto>> GetRolesAsync(PageRequest paging, string? search, CancellationToken cancellationToken = default)
+    {
+        return (await memoryCache.GetOrCreateAsync(CacheKey("roles", paging, search), async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            var query = dbContext.Roles.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
+            return await query.OrderBy(x => x.Name).Select(x => new RoleDto(x.Id, x.Name, x.Description))
+                .ToPagedResultAsync(paging, cancellationToken);
+        }))!;
+    }
+
+    private string CacheKey(string resource, PageRequest paging, string? search) =>
+        $"reference:{cacheState.Version}:{resource}:{paging.Page}:{paging.PageSize}:{search?.Trim().ToLowerInvariant()}";
+
+    public Task<PagedResult<UserDto>> GetUsersAsync(PageRequest paging, string? search, string? role, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Users.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(x => x.FirstName.Contains(search) || x.LastName.Contains(search) || x.UserName.Contains(search) || x.Email.Contains(search));
         if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Name == role));
-        return await query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName).Select(UserProjection()).ToListAsync(cancellationToken);
+        return query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName).Select(UserProjection())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
     public Task<UserDto?> GetUserAsync(int id, CancellationToken cancellationToken = default) =>
         dbContext.Users.AsNoTracking().Where(x => x.Id == id).Select(UserProjection()).SingleOrDefaultAsync(cancellationToken);
 
-    public async Task<IReadOnlyCollection<ManagedUserDto>> GetManagedUsersAsync(string? search, string? role, bool? isActive, CancellationToken cancellationToken = default)
+    public Task<PagedResult<ManagedUserDto>> GetManagedUsersAsync(PageRequest paging, string? search, string? role, bool? isActive, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Users.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -61,8 +107,8 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
         }
         if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Name == role));
         if (isActive.HasValue) query = query.Where(x => x.IsActive == isActive.Value);
-        return await query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName)
-            .Select(ManagedUserProjection()).ToListAsync(cancellationToken);
+        return query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName)
+            .Select(ManagedUserProjection()).ToPagedResultAsync(paging, cancellationToken);
     }
 
     public async Task<ManagedUserDto?> SetUserActiveAsync(int id, bool isActive, int actorId, CancellationToken cancellationToken = default)
@@ -83,6 +129,79 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
         return await dbContext.Users.AsNoTracking().Where(x => x.Id == id).Select(ManagedUserProjection()).SingleAsync(cancellationToken);
     }
 
+    public async Task<ManagedUserDto> CreateUserAsync(SaveManagedUserRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Password))
+            throw new ArgumentException("Lozinka je obavezna prilikom kreiranja korisnika.");
+        var email = request.Email.Trim().ToLowerInvariant();
+        var userName = request.UserName.Trim();
+        if (await dbContext.Users.AnyAsync(x => x.Email == email || x.UserName == userName, cancellationToken))
+            throw new InvalidOperationException("Email adresa ili korisnicko ime vec postoji.");
+        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
+            ?? throw new KeyNotFoundException("Uloga nije pronadjena.");
+        var user = new User
+        {
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
+            Email = email,
+            UserName = userName,
+            PasswordHash = PasswordHash.Create(request.Password),
+            PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
+            IsActive = request.IsActive,
+            UserRoles = [new UserRole { Role = role }]
+        };
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.Users.AsNoTracking().Where(x => x.Id == user.Id)
+            .Select(ManagedUserProjection()).SingleAsync(cancellationToken);
+    }
+
+    public async Task<ManagedUserDto?> UpdateUserAsync(int id, SaveManagedUserRequest request, int actorId, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.Include(x => x.UserRoles).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (user is null) return null;
+        if (id == actorId && !request.IsActive)
+            throw new InvalidOperationException("Ne mozete deaktivirati vlastiti administratorski nalog.");
+        var email = request.Email.Trim().ToLowerInvariant();
+        var userName = request.UserName.Trim();
+        if (await dbContext.Users.AnyAsync(x => x.Id != id && (x.Email == email || x.UserName == userName), cancellationToken))
+            throw new InvalidOperationException("Email adresa ili korisnicko ime vec postoji.");
+        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
+            ?? throw new KeyNotFoundException("Uloga nije pronadjena.");
+        user.FirstName = request.FirstName.Trim();
+        user.LastName = request.LastName.Trim();
+        user.Email = email;
+        user.UserName = userName;
+        user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+        user.IsActive = request.IsActive;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(request.Password)) user.PasswordHash = PasswordHash.Create(request.Password);
+        dbContext.Set<UserRole>().RemoveRange(user.UserRoles);
+        user.UserRoles = [new UserRole { UserId = user.Id, RoleId = role.Id }];
+        if (!user.IsActive)
+        {
+            var tokens = await dbContext.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ToListAsync(cancellationToken);
+            foreach (var token in tokens) token.RevokedAtUtc = DateTime.UtcNow;
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.Users.AsNoTracking().Where(x => x.Id == id)
+            .Select(ManagedUserProjection()).SingleAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeleteUserAsync(int id, int actorId, CancellationToken cancellationToken = default)
+    {
+        if (id == actorId) throw new InvalidOperationException("Ne mozete obrisati vlastiti administratorski nalog.");
+        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (user is null) return false;
+        user.IsActive = false;
+        user.DeletedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        var tokens = await dbContext.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ToListAsync(cancellationToken);
+        foreach (var token in tokens) token.RevokedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static System.Linq.Expressions.Expression<Func<User, UserDto>> UserProjection() => x =>
         new UserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
             x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.ProfileImageUrl);
@@ -95,7 +214,7 @@ public sealed class PlatformQueryService(CabinRentDbContext dbContext) : IPlatfo
 
 public sealed class ReservationService(CabinRentDbContext dbContext) : IReservationService
 {
-    public async Task<IReadOnlyCollection<ReservationDto>> GetAsync(int? guestId, int? ownerId, int? cabinId, string? status, CancellationToken cancellationToken = default)
+    public Task<PagedResult<ReservationDto>> GetAsync(PageRequest paging, int? guestId, int? ownerId, int? cabinId, string? status, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Reservations.AsNoTracking().AsQueryable();
         if (guestId.HasValue) query = query.Where(x => x.GuestId == guestId);
@@ -107,7 +226,8 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
                 throw new ArgumentException("Nepoznat status rezervacije.");
             query = query.Where(x => x.Status == parsed);
         }
-        return await query.OrderByDescending(x => x.CheckIn).Select(Projection()).ToListAsync(cancellationToken);
+        return query.OrderByDescending(x => x.CheckIn).Select(Projection())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
     public Task<ReservationDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
@@ -155,6 +275,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
     {
         if (!Enum.TryParse<ReservationStatus>(request.Status, true, out var status))
             throw new ArgumentException("Nepoznat status rezervacije.");
+        var reason = request.Reason?.Trim();
+        if (status == ReservationStatus.Rejected && string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Razlog odbijanja rezervacije je obavezan.");
         var reservation = await dbContext.Reservations.Include(x => x.Cabin).Include(x => x.Payment)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (reservation is null) return null;
@@ -166,6 +289,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
             throw new InvalidOperationException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
         reservation.Status = status;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangedByUserId = actorId;
+        reservation.StatusChangedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangeReason = string.IsNullOrWhiteSpace(reason) ? null : reason;
         dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.GuestId, "ReservationStatusChanged", "Promijenjen status rezervacije",
             $"Rezervacija {reservation.ConfirmationCode} sada ima status {StatusLabel(status)}.",
@@ -186,6 +312,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
             throw new InvalidOperationException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangedByUserId = guestId;
+        reservation.StatusChangedAtUtc = DateTime.UtcNow;
+        reservation.StatusChangeReason = "Rezervaciju je otkazao gost.";
         dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.Cabin.OwnerId, "ReservationCancelled", "Otkazana rezervacija",
             $"Gost je otkazao rezervaciju {reservation.ConfirmationCode} za vikendicu {reservation.Cabin.Name}.",
@@ -267,6 +396,9 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
               x.Payment == null ? null : x.Payment.PaidAtUtc,
               x.Payment == null ? 0 : x.Payment.RefundedAmount,
               x.Payment == null ? null : x.Payment.RefundedAtUtc,
+              x.StatusChangedByUserId,
+              x.StatusChangedByUser == null ? null : x.StatusChangedByUser.FirstName + " " + x.StatusChangedByUser.LastName,
+              x.StatusChangedAtUtc, x.StatusChangeReason,
               x.CreatedAtUtc);
 
     private static string StatusLabel(ReservationStatus status) => status switch
@@ -281,24 +413,25 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
 public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
 {
-    public async Task<IReadOnlyCollection<ReviewDto>> GetAsync(int? cabinId, bool? approved, CancellationToken cancellationToken = default)
+    public Task<PagedResult<ReviewDto>> GetAsync(PageRequest paging, int? cabinId, bool? approved, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Reviews.AsNoTracking()
             .Where(x => x.Cabin.IsActive && x.Cabin.Owner.IsActive)
             .AsQueryable();
         if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
         if (approved.HasValue) query = query.Where(x => x.IsApproved == approved);
-        return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
+        return query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<ReviewDto>> GetMineAsync(int guestId, CancellationToken cancellationToken = default) =>
-        await dbContext.Reviews.AsNoTracking()
+    public Task<PagedResult<ReviewDto>> GetMineAsync(PageRequest paging, int guestId, CancellationToken cancellationToken = default) =>
+        dbContext.Reviews.AsNoTracking()
             .Where(x => x.GuestId == guestId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(Projection())
-            .ToListAsync(cancellationToken);
+            .ToPagedResultAsync(paging, cancellationToken);
 
-    public async Task<IReadOnlyCollection<ReviewDto>> GetManagedAsync(int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default)
+    public Task<PagedResult<ReviewDto>> GetManagedAsync(PageRequest paging, int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default)
     {
         if (rating is < 1 or > 5) throw new ArgumentException("Ocjena mora biti između 1 i 5.");
         var query = dbContext.Reviews.AsNoTracking().AsQueryable();
@@ -312,7 +445,8 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
             query = query.Where(x => x.Guest.FirstName.Contains(term) || x.Guest.LastName.Contains(term) ||
                 (x.Comment != null && x.Comment.Contains(term)) || x.Cabin.Name.Contains(term));
         }
-        return await query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection()).ToListAsync(cancellationToken);
+        return query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection())
+            .ToPagedResultAsync(paging, cancellationToken);
     }
 
     public async Task<ReviewDto> CreateAsync(CreateReviewRequest request, int guestId, CancellationToken cancellationToken = default)
@@ -347,6 +481,29 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         return await dbContext.Reviews.AsNoTracking().Where(x => x.Id == id).Select(Projection()).SingleAsync(cancellationToken);
     }
 
+    public async Task<ReviewDto?> UpdateAsync(int id, UpdateReviewRequest request, int guestId, CancellationToken cancellationToken = default)
+    {
+        var review = await dbContext.Reviews.SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
+        if (review is null) return null;
+        review.Rating = request.Rating;
+        review.Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        review.IsApproved = false;
+        review.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.Reviews.AsNoTracking().Where(x => x.Id == id).Select(Projection()).SingleAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeleteAsync(int id, int actorId, bool isAdmin, CancellationToken cancellationToken = default)
+    {
+        var review = await dbContext.Reviews.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (review is null) return false;
+        if (!isAdmin && review.GuestId != actorId)
+            throw new UnauthorizedAccessException("Nemate pristup ovoj recenziji.");
+        dbContext.Reviews.Remove(review);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static System.Linq.Expressions.Expression<Func<Review, ReviewDto>> Projection() => x =>
         new ReviewDto(x.Id, x.ReservationId, x.CabinId, x.Cabin.Name, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Rating, x.Comment, x.IsApproved, x.CreatedAtUtc);
@@ -354,11 +511,12 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
 
 public sealed class FavoriteService(CabinRentDbContext dbContext) : IFavoriteService
 {
-    public async Task<IReadOnlyCollection<FavoriteDto>> GetAsync(int userId, CancellationToken cancellationToken = default) =>
-        await dbContext.Favorites.AsNoTracking()
+    public Task<PagedResult<FavoriteDto>> GetAsync(PageRequest paging, int userId, CancellationToken cancellationToken = default) =>
+        dbContext.Favorites.AsNoTracking()
             .Where(x => x.UserId == userId && x.Cabin.IsActive && x.Cabin.Owner.IsActive)
             .OrderByDescending(x => x.CreatedAtUtc)
-            .Select(x => new FavoriteDto(x.UserId, x.CabinId, x.Cabin.Name, x.Cabin.PricePerNight, x.CreatedAtUtc)).ToListAsync(cancellationToken);
+            .Select(x => new FavoriteDto(x.UserId, x.CabinId, x.Cabin.Name, x.Cabin.PricePerNight, x.CreatedAtUtc))
+            .ToPagedResultAsync(paging, cancellationToken);
 
     public async Task<FavoriteDto> AddAsync(AddFavoriteRequest request, int userId, CancellationToken cancellationToken = default)
     {
