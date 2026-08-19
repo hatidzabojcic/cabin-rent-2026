@@ -237,3 +237,12 @@ public sealed class Notification : Entity
     public int UserId { get; set; }
     public User User { get; set; } = null!;
 }
+
+public sealed class Announcement : Entity
+{
+    public required string Title { get; set; }
+    public required string Content { get; set; }
+    public string? ImageUrl { get; set; }
+    public DateTime PublishedAtUtc { get; set; }
+    public bool IsActive { get; set; } = true;
+}

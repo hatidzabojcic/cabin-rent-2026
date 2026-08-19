@@ -21,6 +21,7 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
     public DbSet<AvailabilityBlock> AvailabilityBlocks => Set<AvailabilityBlock>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,10 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<RefreshToken>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
         modelBuilder.Entity<Notification>().HasIndex(x => x.EventId).IsUnique();
         modelBuilder.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAtUtc });
+        modelBuilder.Entity<Announcement>().Property(x => x.Title).HasMaxLength(200);
+        modelBuilder.Entity<Announcement>().Property(x => x.Content).HasMaxLength(4000);
+        modelBuilder.Entity<Announcement>().Property(x => x.ImageUrl).HasMaxLength(1000);
+        modelBuilder.Entity<Announcement>().HasIndex(x => new { x.IsActive, x.PublishedAtUtc });
 
         modelBuilder.Entity<Cabin>().Property(x => x.PricePerNight).HasPrecision(10, 2);
         modelBuilder.Entity<Cabin>().Property(x => x.AreaSquareMeters).HasPrecision(8, 2);

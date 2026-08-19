@@ -19,6 +19,26 @@ public static class DatabaseInitializer
         await SeedUsersAsync(dbContext, configuration, cancellationToken);
         await SeedDemoDataAsync(dbContext, cancellationToken);
         await SeedSecondaryOwnerDataAsync(dbContext, configuration, cancellationToken);
+        await SeedAnnouncementsAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task SeedAnnouncementsAsync(CabinRentDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (await dbContext.Announcements.AnyAsync(cancellationToken)) return;
+        dbContext.Announcements.AddRange(
+            new Announcement
+            {
+                Title = "Dobro došli u CabinRent",
+                Content = "Pronađite vikendicu, provjerite dostupnost i rezervišite svoj sljedeći odmor na jednom mjestu.",
+                PublishedAtUtc = DateTime.UtcNow.AddDays(-7), IsActive = true
+            },
+            new Announcement
+            {
+                Title = "Sigurno online plaćanje",
+                Content = "Potvrđene rezervacije možete platiti karticom kroz Stripe testno okruženje.",
+                PublishedAtUtc = DateTime.UtcNow.AddDays(-2), IsActive = true
+            });
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedReferenceDataAsync(CabinRentDbContext dbContext, CancellationToken cancellationToken)
