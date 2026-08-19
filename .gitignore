@@ -3,6 +3,7 @@ obj/
 .vs/
 .idea/
 .env
+.env-tajne-password.txt
 .tools/
 .stripe-listener/
 .dotnet-home/
