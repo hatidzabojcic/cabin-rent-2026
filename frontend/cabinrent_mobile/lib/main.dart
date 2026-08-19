@@ -20,6 +20,7 @@ import 'features/reservations/data/reservations_repository.dart';
 import 'features/reservations/presentation/reservations_controller.dart';
 import 'features/reviews/data/reviews_repository.dart';
 import 'features/reviews/presentation/reviews_controller.dart';
+import 'features/announcements/data/announcements_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,7 @@ void main() {
         ChangeNotifierProvider(
           create: (_) => ReviewsController(ReviewsRepository(api)),
         ),
+        Provider.value(value: AnnouncementsRepository(api)),
         ChangeNotifierProvider(
           create: (_) => NotificationsController(NotificationsRepository(api)),
         ),

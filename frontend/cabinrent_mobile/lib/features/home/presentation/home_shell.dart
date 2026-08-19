@@ -12,6 +12,8 @@ import '../../reservations/presentation/reservations_controller.dart';
 import '../../reservations/presentation/reservations_screen.dart';
 import '../../recommendations/domain/recommendation.dart';
 import '../../recommendations/presentation/recommendations_controller.dart';
+import '../../announcements/data/announcements_repository.dart';
+import '../../announcements/domain/announcement.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -132,10 +134,12 @@ class _WelcomePage extends StatefulWidget {
 
 class _WelcomePageState extends State<_WelcomePage> {
   int? _favoriteRevision;
+  Future<List<Announcement>>? _announcements;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _announcements ??= context.read<AnnouncementsRepository>().getPublished();
     final revision = context.watch<FavoritesController>().revision;
     if (_favoriteRevision == null) {
       _favoriteRevision = revision;
@@ -147,13 +151,26 @@ class _WelcomePageState extends State<_WelcomePage> {
     }
   }
 
+  Future<void> _refresh() async {
+    final announcements = context.read<AnnouncementsRepository>().getPublished();
+    setState(() => _announcements = announcements);
+    await Future.wait([
+      announcements,
+      context.read<RecommendationsController>().load(),
+      context.read<FavoritesController>().load(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user!;
     final controller = context.watch<RecommendationsController>();
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
         const SizedBox(height: 12),
         Text(
           'Pozdrav, ${user.firstName}',
@@ -163,7 +180,30 @@ class _WelcomePageState extends State<_WelcomePage> {
         ),
         const SizedBox(height: 6),
         const Text('Vrijeme je za planiranje sljedećeg odmora.'),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Novosti',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            IconButton(onPressed: _refresh, tooltip: 'Osvježi', icon: const Icon(Icons.refresh)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder<List<Announcement>>(
+          future: _announcements,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(height: 90, child: Center(child: CircularProgressIndicator()));
+            }
+            final items = snapshot.data ?? const <Announcement>[];
+            return Column(children: items.take(3).map((item) => _AnnouncementCard(item: item)).toList());
+          },
+        ),
+        const SizedBox(height: 18),
         Row(
           children: [
             Expanded(
@@ -216,10 +256,49 @@ class _WelcomePageState extends State<_WelcomePage> {
               ),
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
+
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({required this.item});
+  final Announcement item;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 10),
+    clipBehavior: Clip.antiAlias,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 80,
+          height: 96,
+          child: item.imageUrl == null
+              ? const ColoredBox(color: Color(0xFFE3EBE7), child: Icon(Icons.campaign_outlined))
+              : Image.network(item.imageUrl!, fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFFE3EBE7), child: Icon(Icons.campaign_outlined))),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(item.content, maxLines: 2, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 5),
+              Text(_announcementDate(item.publishedAtUtc), style: Theme.of(context).textTheme.bodySmall),
+            ]),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+String _announcementDate(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}.';
 
 class _RecommendationCard extends StatelessWidget {
   const _RecommendationCard({
