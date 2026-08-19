@@ -5,6 +5,8 @@ namespace CabinRent.Services.Payments;
 public interface IPaymentService
 {
     Task<PaymentIntentDto> CreateIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default);
+    Task<PaymentConfirmationDto> ConfirmIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default);
+    Task<bool> CancelReservationAsync(int reservationId, int actorId, bool isAdmin, bool isOwner, CancellationToken cancellationToken = default);
     Task<PaymentWebhookResultDto> ProcessWebhookAsync(string payload, string signature, CancellationToken cancellationToken = default);
 }
 
@@ -19,10 +21,22 @@ public interface IPaymentGateway
         string idempotencyKey,
         CancellationToken cancellationToken = default);
     Task<GatewayPaymentIntent> GetIntentAsync(string providerReference, CancellationToken cancellationToken = default);
+    Task<GatewayRefund> RefundAsync(
+        string paymentIntentId,
+        long amountInMinorUnits,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
     GatewayWebhookEvent ParseWebhook(string payload, string signature);
 }
 
-public sealed record GatewayPaymentIntent(string Id, string ClientSecret, string Status);
+public sealed record GatewayPaymentIntent(
+    string Id,
+    string ClientSecret,
+    string Status,
+    long Amount,
+    long AmountReceived,
+    string Currency);
+public sealed record GatewayRefund(string Id, string Status, long Amount, string Currency);
 public sealed record GatewayWebhookEvent(
     string EventId,
     string Type,

@@ -13,4 +13,12 @@ class PaymentsRepository {
           authenticated: true,
         ),
       );
+
+  Future<String> confirmIntent(int reservationId) async {
+    final response = await _api.post(
+      '/api/payments/reservations/$reservationId/confirm',
+      authenticated: true,
+    );
+    return response['status'] as String? ?? 'Pending';
+  }
 }

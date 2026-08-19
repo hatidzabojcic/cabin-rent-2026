@@ -64,6 +64,34 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
+    public async Task<GatewayRefund> RefundAsync(
+        string paymentIntentId,
+        long amountInMinorUnits,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        try
+        {
+            var refund = await new RefundService(_client).CreateAsync(new RefundCreateOptions
+            {
+                PaymentIntent = paymentIntentId,
+                Amount = amountInMinorUnits,
+                Reason = "requested_by_customer",
+                Metadata = new Dictionary<string, string>
+                {
+                    ["source"] = "cabinrent_reservation_cancellation"
+                }
+            }, new RequestOptions { IdempotencyKey = idempotencyKey }, cancellationToken);
+
+            return new GatewayRefund(refund.Id, refund.Status, refund.Amount, refund.Currency);
+        }
+        catch (StripeException exception)
+        {
+            throw new PaymentProviderException("Stripe trenutno nije mogao izvršiti povrat novca. Rezervacija nije otkazana.", exception);
+        }
+    }
+
     public GatewayWebhookEvent ParseWebhook(string payload, string signature)
     {
         if (string.IsNullOrWhiteSpace(_options.WebhookSecret))
@@ -99,5 +127,11 @@ public sealed class StripePaymentGateway : IPaymentGateway
     }
 
     private static GatewayPaymentIntent Map(PaymentIntent intent) =>
-        new(intent.Id, intent.ClientSecret ?? throw new InvalidOperationException("Stripe nije vratio client secret."), intent.Status);
+        new(
+            intent.Id,
+            intent.ClientSecret ?? throw new InvalidOperationException("Stripe nije vratio client secret."),
+            intent.Status,
+            intent.Amount,
+            intent.AmountReceived,
+            intent.Currency);
 }

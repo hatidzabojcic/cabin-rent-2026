@@ -28,7 +28,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Otkazati rezervaciju?'),
         content: Text(
-          'Želite li otkazati rezervaciju ${_reservation.confirmationCode}?',
+          _reservation.paymentStatus == 'Paid'
+              ? 'Otkazivanjem rezervacije ${_reservation.confirmationCode} puni uplaćeni iznos bit će vraćen putem Stripea.'
+              : 'Želite li otkazati rezervaciju ${_reservation.confirmationCode}?',
         ),
         actions: [
           TextButton(
@@ -371,6 +373,13 @@ class _PaymentSection extends StatelessWidget {
       ('Status', paymentStatusLabel(reservation.paymentStatus)),
       if (reservation.paidAtUtc != null)
         ('Datum uplate', formatDate(reservation.paidAtUtc!.toLocal())),
+      if (reservation.paymentStatus == 'Refunded')
+        (
+          'Refundirano',
+          '${reservation.refundedAmount.toStringAsFixed(2)} $_currency',
+        ),
+      if (reservation.refundedAtUtc != null)
+        ('Datum povrata', formatDate(reservation.refundedAtUtc!.toLocal())),
     ],
   );
 }

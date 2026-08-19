@@ -155,10 +155,13 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
     {
         if (!Enum.TryParse<ReservationStatus>(request.Status, true, out var status))
             throw new ArgumentException("Nepoznat status rezervacije.");
-        var reservation = await dbContext.Reservations.Include(x => x.Cabin).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var reservation = await dbContext.Reservations.Include(x => x.Cabin).Include(x => x.Payment)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (reservation is null) return null;
         if (!isAdmin && reservation.Cabin.OwnerId != actorId) throw new UnauthorizedAccessException("Nemate pristup ovoj rezervaciji.");
         if (reservation.Status == status) return await GetByIdAsync(id, cancellationToken);
+        if (status == ReservationStatus.Cancelled && reservation.Payment?.Status == PaymentStatus.Paid)
+            throw new InvalidOperationException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         if (!ReservationStatusRules.CanTransition(reservation.Status, status))
             throw new InvalidOperationException($"Status rezervacije nije moguće promijeniti iz {reservation.Status} u {status}.");
         reservation.Status = status;
@@ -173,12 +176,14 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
     public async Task<ReservationDto?> CancelAsync(int id, int guestId, CancellationToken cancellationToken = default)
     {
-        var reservation = await dbContext.Reservations.Include(x => x.Cabin)
+        var reservation = await dbContext.Reservations.Include(x => x.Cabin).Include(x => x.Payment)
             .SingleOrDefaultAsync(x => x.Id == id && x.GuestId == guestId, cancellationToken);
         if (reservation is null) return null;
         if (!ReservationStatusRules.CanGuestCancel(reservation.Status, reservation.CheckIn, DateOnly.FromDateTime(DateTime.UtcNow)))
             throw new InvalidOperationException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
 
+        if (reservation.Payment?.Status == PaymentStatus.Paid)
+            throw new InvalidOperationException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAtUtc = DateTime.UtcNow;
         dbContext.EnqueueNotification(new NotificationEvent(
@@ -255,11 +260,14 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         new ReservationDto(x.Id, x.ConfirmationCode, x.CabinId, x.Cabin.Name, x.Cabin.OwnerId, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,
             x.CheckIn, x.CheckOut, x.Adults, x.Children, x.PricePerNight, x.TotalPrice,
-            x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(),
-            x.Payment != null && x.Payment.Status == PaymentStatus.Paid ? x.Payment.ChargedAmount ?? x.Payment.Amount : 0,
-            x.Payment == null ? null : x.Payment.Currency,
-            x.Payment == null ? null : x.Payment.PaidAtUtc,
-            x.CreatedAtUtc);
+              x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(),
+              x.Payment != null && (x.Payment.Status == PaymentStatus.Paid || x.Payment.Status == PaymentStatus.Refunded)
+                  ? x.Payment.ChargedAmount ?? x.Payment.Amount : 0,
+              x.Payment == null ? null : x.Payment.Currency,
+              x.Payment == null ? null : x.Payment.PaidAtUtc,
+              x.Payment == null ? 0 : x.Payment.RefundedAmount,
+              x.Payment == null ? null : x.Payment.RefundedAtUtc,
+              x.CreatedAtUtc);
 
     private static string StatusLabel(ReservationStatus status) => status switch
     {

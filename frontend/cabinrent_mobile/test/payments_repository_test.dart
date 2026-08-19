@@ -41,4 +41,29 @@ void main() {
       expect(intent.publishableKey, 'pk_test_value');
     },
   );
+
+  test('confirms Stripe intent through the backend', () async {
+    late http.Request capturedRequest;
+    final client = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response(
+        jsonEncode({
+          'paymentId': 31,
+          'reservationId': 21,
+          'status': 'Paid',
+          'paidAmount': 290,
+          'currency': 'BAM',
+        }),
+        200,
+      );
+    });
+    final api = ApiClient(client: client)..accessToken = 'guest-token';
+
+    final status = await PaymentsRepository(api).confirmIntent(21);
+
+    expect(capturedRequest.method, 'POST');
+    expect(capturedRequest.url.path, '/api/payments/reservations/21/confirm');
+    expect(capturedRequest.headers['Authorization'], 'Bearer guest-token');
+    expect(status, 'Paid');
+  });
 }

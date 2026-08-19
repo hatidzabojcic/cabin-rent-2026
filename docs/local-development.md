@@ -17,16 +17,18 @@ Vrijednosti ispod služe isključivo lokalnom razvoju. Njihov trajni izvor je `.
 
 U bazi se aplikacijske lozinke nikada ne čuvaju kao tekst. Seed proces ih pretvara u PBKDF2-SHA256 hash. Promjena lozinke u `.env` ne mijenja već kreiranog korisnika; za to ćemo koristiti password-change/reset funkcionalnost.
 
-## Stripe webhook listener
+## Stripe plaćanje i opcionalni webhook listener
 
 Stripe CLI se lokalno čuva u ignorisanom folderu `.tools/stripe`, a ključevi u ignorisanoj `.env` datoteci.
-Nakon restarta računara ili prije testiranja plaćanja iz root foldera projekta pokrenite:
+Mobilna aplikacija nakon PaymentSheeta traži od API-ja server-side provjeru PaymentIntenta, pa osnovno plaćanje i refund rade bez ručnog pokretanja Stripe CLI-ja.
+
+Za dodatno testiranje asinhronih Stripe webhook događaja iz root foldera projekta opcionalno pokrenite:
 
 ```powershell
 .\scripts\start-stripe-webhook.ps1
 ```
 
-Skripta pokreće listener za Stripe testni račun, ažurira `STRIPE_WEBHOOK_SECRET`, ponovo učitava samo API kontejner i provjerava `/health` endpoint. Vrijednosti ključeva se ne ispisuju u terminal.
+Skripta pokreće listener za Stripe testni račun, ažurira `STRIPE_WEBHOOK_SECRET`, ponovo učitava samo API kontejner i provjerava `/health` endpoint. Vrijednosti ključeva se ne ispisuju u terminal. Webhook ostaje rezervni kanal za asinhrone promjene statusa i nije preduslov za standardni test plaćanja.
 
 ## Prvo pokretanje
 

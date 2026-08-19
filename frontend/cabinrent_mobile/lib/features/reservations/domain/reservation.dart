@@ -15,6 +15,8 @@ class Reservation {
     this.paymentStatus,
     this.paymentCurrency,
     this.paidAtUtc,
+    this.refundedAmount = 0,
+    this.refundedAtUtc,
     this.specialRequests,
   });
   factory Reservation.fromJson(Map<String, dynamic> json) => Reservation(
@@ -44,16 +46,20 @@ class Reservation {
     paidAtUtc: json['paidAtUtc'] == null
         ? null
         : DateTime.parse(json['paidAtUtc'] as String).toUtc(),
+    refundedAmount: (json['refundedAmount'] as num?)?.toDouble() ?? 0,
+    refundedAtUtc: json['refundedAtUtc'] == null
+        ? null
+        : DateTime.parse(json['refundedAtUtc'] as String).toUtc(),
     specialRequests: json['specialRequests'] as String?,
   );
   final int id, adults, children;
   final int cabinId;
   final String confirmationCode, cabinName, status;
   final DateTime checkIn, checkOut;
-  final double pricePerNight, totalPrice, paidAmount;
+  final double pricePerNight, totalPrice, paidAmount, refundedAmount;
   final String? paymentStatus;
   final String? paymentCurrency, specialRequests;
-  final DateTime? paidAtUtc;
+  final DateTime? paidAtUtc, refundedAtUtc;
   bool get canCancel => status == 'Pending' || status == 'Confirmed';
   bool get canReview => status == 'Completed';
   bool get canPay =>

@@ -3,13 +3,14 @@ using CabinRent.Services.Platform;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using CabinRent.API.Infrastructure;
+using CabinRent.Services.Payments;
 
 namespace CabinRent.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public sealed class ReservationsController(IReservationService service) : ControllerBase
+public sealed class ReservationsController(IReservationService service, IPaymentService paymentService) : ControllerBase
 {
     [HttpGet]
     public Task<IReadOnlyCollection<ReservationDto>> Get([FromQuery] int? cabinId, [FromQuery] string? status, CancellationToken cancellationToken)
@@ -43,6 +44,13 @@ public sealed class ReservationsController(IReservationService service) : Contro
     [Authorize(Roles = "Admin,Owner")]
     public async Task<ActionResult<ReservationDto>> UpdateStatus(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken)
     {
+        if (string.Equals(request.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            var cancelled = await paymentService.CancelReservationAsync(
+                id, User.GetUserId(), User.IsInRole("Admin"), User.IsInRole("Owner"), cancellationToken);
+            if (!cancelled) return NotFound();
+            return Ok(await service.GetByIdAsync(id, cancellationToken));
+        }
         var reservation = await service.UpdateStatusAsync(id, request, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
         return reservation is null ? NotFound() : Ok(reservation);
     }
@@ -51,8 +59,10 @@ public sealed class ReservationsController(IReservationService service) : Contro
     [Authorize(Roles = "Guest")]
     public async Task<ActionResult<ReservationDto>> Cancel(int id, CancellationToken cancellationToken)
     {
-        var reservation = await service.CancelAsync(id, User.GetUserId(), cancellationToken);
-        return reservation is null ? NotFound() : Ok(reservation);
+        var cancelled = await paymentService.CancelReservationAsync(
+            id, User.GetUserId(), isAdmin: false, isOwner: false, cancellationToken);
+        if (!cancelled) return NotFound();
+        return Ok(await service.GetByIdAsync(id, cancellationToken));
     }
 
     [HttpPatch("{id:int}/reschedule")]

@@ -29,18 +29,25 @@ class PaymentsController extends ChangeNotifier {
 
     try {
       final intent = await _repository.createIntent(reservationId);
-      Stripe.publishableKey = intent.publishableKey;
-      await Stripe.instance.applySettings();
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: intent.clientSecret,
-          merchantDisplayName: 'CabinRent',
-          style: ThemeMode.system,
-          allowsDelayedPaymentMethods: false,
-        ),
-      );
-      await Stripe.instance.presentPaymentSheet();
-      _awaitingConfirmation.add(reservationId);
+      if (intent.status != 'succeeded') {
+        Stripe.publishableKey = intent.publishableKey;
+        await Stripe.instance.applySettings();
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: intent.clientSecret,
+            merchantDisplayName: 'CabinRent',
+            style: ThemeMode.system,
+            allowsDelayedPaymentMethods: false,
+          ),
+        );
+        await Stripe.instance.presentPaymentSheet();
+      }
+      final status = await _repository.confirmIntent(reservationId);
+      if (status == 'Paid') {
+        _awaitingConfirmation.remove(reservationId);
+      } else {
+        _awaitingConfirmation.add(reservationId);
+      }
       return PaymentResult.succeeded;
     } on StripeException catch (error) {
       if (error.error.code == FailureCode.Canceled) {

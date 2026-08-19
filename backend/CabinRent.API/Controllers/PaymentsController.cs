@@ -19,6 +19,14 @@ public sealed class PaymentsController(IPaymentService paymentService) : Control
         return Ok(intent);
     }
 
+    [HttpPost("reservations/{reservationId:int}/confirm")]
+    [ProducesResponseType<PaymentConfirmationDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaymentConfirmationDto>> ConfirmIntent(int reservationId, CancellationToken cancellationToken)
+    {
+        var confirmation = await paymentService.ConfirmIntentAsync(reservationId, User.GetUserId(), cancellationToken);
+        return Ok(confirmation);
+    }
+
     [HttpPost("webhook")]
     [AllowAnonymous]
     [ProducesResponseType<PaymentWebhookResultDto>(StatusCodes.Status200OK)]

@@ -7,7 +7,8 @@ public sealed record ReservationDto(
     string GuestEmail, string? GuestPhoneNumber,
     DateOnly CheckIn, DateOnly CheckOut, int Adults, int Children, decimal PricePerNight,
     decimal TotalPrice, string Status, string? SpecialRequests, string? PaymentStatus,
-    decimal PaidAmount, string? PaymentCurrency, DateTime? PaidAtUtc, DateTime CreatedAtUtc);
+    decimal PaidAmount, string? PaymentCurrency, DateTime? PaidAtUtc,
+    decimal RefundedAmount, DateTime? RefundedAtUtc, DateTime CreatedAtUtc);
 
 public sealed class CreateReservationRequest
 {

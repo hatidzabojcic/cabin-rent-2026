@@ -10,3 +10,10 @@ public sealed record PaymentIntentDto(
     string PublishableKey);
 
 public sealed record PaymentWebhookResultDto(string EventId, string Outcome);
+
+public sealed record PaymentConfirmationDto(
+    int PaymentId,
+    int ReservationId,
+    string Status,
+    decimal PaidAmount,
+    string Currency);
