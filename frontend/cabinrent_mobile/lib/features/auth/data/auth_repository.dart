@@ -82,6 +82,19 @@ class AuthRepository {
     await _storage.clear();
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _api.put(
+      '/api/auth/me/password',
+      authenticated: true,
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+    _api.accessToken = null;
+    await _storage.clear();
+  }
+
   Future<AppUser> updateProfile({
     required String firstName,
     required String lastName,

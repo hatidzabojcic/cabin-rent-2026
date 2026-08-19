@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import 'edit_profile_screen.dart';
+import 'change_password_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -214,6 +215,18 @@ class ProfileScreen extends StatelessWidget {
                 ),
           icon: const Icon(Icons.manage_accounts_outlined),
           label: const Text('Uredi podatke profila'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: auth.isLoading
+              ? null
+              : () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ChangePasswordScreen(),
+                  ),
+                ),
+          icon: const Icon(Icons.password_outlined),
+          label: const Text('Promijeni lozinku'),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(

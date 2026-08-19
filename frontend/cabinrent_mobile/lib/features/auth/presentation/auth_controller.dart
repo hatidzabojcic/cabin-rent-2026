@@ -186,4 +186,31 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
     return false;
   }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (_session == null || status == AuthStatus.loading) return false;
+    status = AuthStatus.loading;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      _session = null;
+      status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return true;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+    } catch (_) {
+      errorMessage = 'Lozinku trenutno nije mogu\u0107e promijeniti.';
+    }
+    status = AuthStatus.authenticated;
+    notifyListeners();
+    return false;
+  }
 }
