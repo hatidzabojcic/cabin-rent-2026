@@ -40,7 +40,7 @@ services:
       dockerfile: backend/CabinRent.API/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=CabinRent;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=IB160182;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
@@ -76,7 +76,7 @@ services:
       context: .
       dockerfile: backend/CabinRent.Notifications/Dockerfile
     environment:
-      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=CabinRent;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+      ConnectionStrings__DefaultConnection: Server=cabinrent-sql,1433;Database=IB160182;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
       RabbitMq__Host: cabinrent-rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: ${RABBITMQ_USER}

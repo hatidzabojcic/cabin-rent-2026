@@ -55,7 +55,7 @@ API pri pokretanju automatski primjenjuje samo migracije koje još nisu izvršen
 2. Izaberi `MS SQL: Connect` ili `MSSQL: Connect`.
 3. Kreiraj profil sa serverom `localhost`, portom `1433`, korisnikom `sa` i lozinkom iz `.env`.
 4. Uključi `Trust server certificate`.
-5. Nakon spajanja odaberi bazu `CabinRent`.
+5. Nakon spajanja odaberi bazu `IB160182` (broj indeksa autora rada).
 6. Kreiraj `.sql` datoteku i izvrši upite pomoću `MS SQL: Execute Query`.
 
 ```sql

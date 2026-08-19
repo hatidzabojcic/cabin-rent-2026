@@ -4,6 +4,7 @@ using CabinRent.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CabinRent.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CabinRentDbContext))]
-    partial class CabinRentDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260819160454_AddReservationStatusAudit")]
+    partial class AddReservationStatusAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -48,7 +51,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Amenities", (string)null);
+                    b.ToTable("Amenities");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.AvailabilityBlock", b =>
@@ -81,7 +84,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CabinId");
 
-                    b.ToTable("AvailabilityBlocks", null, t =>
+                    b.ToTable("AvailabilityBlocks", t =>
                         {
                             t.HasCheckConstraint("CK_AvailabilityBlock_Dates", "[To] > [From]");
                         });
@@ -159,7 +162,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Cabins", (string)null);
+                    b.ToTable("Cabins");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.CabinAmenity", b =>
@@ -174,7 +177,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AmenityId");
 
-                    b.ToTable("CabinAmenity", (string)null);
+                    b.ToTable("CabinAmenity");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.CabinImage", b =>
@@ -211,7 +214,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CabinId");
 
-                    b.ToTable("CabinImages", (string)null);
+                    b.ToTable("CabinImages");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.CabinType", b =>
@@ -240,7 +243,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("CabinTypes", (string)null);
+                    b.ToTable("CabinTypes");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.City", b =>
@@ -271,7 +274,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CountryId");
 
-                    b.ToTable("Cities", (string)null);
+                    b.ToTable("Cities");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.Country", b =>
@@ -301,7 +304,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("IsoCode")
                         .IsUnique();
 
-                    b.ToTable("Countries", (string)null);
+                    b.ToTable("Countries");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.Favorite", b =>
@@ -319,7 +322,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CabinId");
 
-                    b.ToTable("Favorites", (string)null);
+                    b.ToTable("Favorites");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.Notification", b =>
@@ -373,7 +376,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "IsRead", "CreatedAtUtc");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.NotificationOutbox", b =>
@@ -441,7 +444,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PublishedAtUtc", "NextAttemptAtUtc", "CreatedAtUtc");
 
-                    b.ToTable("NotificationOutbox", (string)null);
+                    b.ToTable("NotificationOutbox");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.Payment", b =>
@@ -508,7 +511,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReservationId")
                         .IsUnique();
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.PaymentWebhookEvent", b =>
@@ -556,7 +559,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProviderEventId")
                         .IsUnique();
 
-                    b.ToTable("PaymentWebhookEvents", (string)null);
+                    b.ToTable("PaymentWebhookEvents");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.RefreshToken", b =>
@@ -602,7 +605,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "ExpiresAtUtc");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.Reservation", b =>
@@ -676,7 +679,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("StatusChangedByUserId");
 
-                    b.ToTable("Reservations", null, t =>
+                    b.ToTable("Reservations", t =>
                         {
                             t.HasCheckConstraint("CK_Reservation_Dates", "[CheckOut] > [CheckIn]");
 
@@ -727,7 +730,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReservationId")
                         .IsUnique();
 
-                    b.ToTable("Reviews", null, t =>
+                    b.ToTable("Reviews", t =>
                         {
                             t.HasCheckConstraint("CK_Review_Rating", "[Rating] BETWEEN 1 AND 5");
                         });
@@ -759,7 +762,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.User", b =>
@@ -816,7 +819,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserName")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.UserRole", b =>
@@ -831,7 +834,7 @@ namespace CabinRent.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRole", (string)null);
+                    b.ToTable("UserRole");
                 });
 
             modelBuilder.Entity("CabinRent.Infrastructure.Persistence.AvailabilityBlock", b =>

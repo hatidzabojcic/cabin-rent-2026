@@ -8,7 +8,7 @@ public sealed class CabinRentDbContextFactory : IDesignTimeDbContextFactory<Cabi
     public CabinRentDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Server=localhost,1433;Database=CabinRent;User Id=sa;Password=CabinRent_2026!Dev;Encrypt=False;TrustServerCertificate=True";
+            ?? "Server=localhost,1433;Database=IB160182;User Id=sa;Password=CabinRent_2026!Dev;Encrypt=False;TrustServerCertificate=True";
 
         var options = new DbContextOptionsBuilder<CabinRentDbContext>()
             .UseSqlServer(connectionString)
