@@ -88,10 +88,16 @@ class _AppShellState extends State<AppShell> {
           label: Text('\u0160ifrarnici'),
         ),
       if (user.isAdmin)
-        const NavigationRailDestination(icon: Icon(Icons.campaign_outlined), selectedIcon: Icon(Icons.campaign), label: Text('Novosti')),
+        const NavigationRailDestination(
+          icon: Icon(Icons.campaign_outlined),
+          selectedIcon: Icon(Icons.campaign),
+          label: Text('Novosti'),
+        ),
     ];
     final screens = <Widget>[
-      const DashboardScreen(),
+      DashboardScreen(
+        onNavigate: (index) => setState(() => _selectedIndex = index),
+      ),
       const CabinsScreen(),
       const ReservationsScreen(),
       const ReviewsScreen(),
