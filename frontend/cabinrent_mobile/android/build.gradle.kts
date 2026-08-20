@@ -11,6 +11,18 @@ subprojects {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
+
+    // flutter_stripe includes an optional Stripe Issuing/TapAndPay module that
+    // CabinRent does not use. Its release lint classpath references a Google
+    // artifact that is not publicly available, so only that plugin lint task
+    // is skipped. Application release lint and Stripe card payments stay on.
+    if (name == "stripe_android") {
+        tasks.configureEach {
+            if (name == "lintVitalAnalyzeRelease") {
+                enabled = false
+            }
+        }
+    }
 }
 
 val newBuildDir: Directory =
