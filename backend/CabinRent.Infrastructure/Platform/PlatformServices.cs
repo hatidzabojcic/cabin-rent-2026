@@ -235,14 +235,53 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
     public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, int guestId, CancellationToken cancellationToken = default)
     {
-        if (request.CheckOut <= request.CheckIn) throw new RequestValidationException("Check-out mora biti nakon check-in datuma.");
-        var cabin = await dbContext.Cabins.Where(CabinVisibilityRules.PubliclyVisible)
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (!ReservationCreationRules.IsCheckInInFuture(
+                request.CheckIn,
+                today))
+        {
+            throw new RequestValidationException(
+                "Datum dolaska mora biti u budućnosti.");
+        }
+
+        if (request.CheckOut <= request.CheckIn)
+        {
+            throw new RequestValidationException(
+                "Check-out mora biti nakon check-in datuma.");
+        }
+
+        if (!ReservationCreationRules.HasValidGuestCounts(
+                request.Adults,
+                request.Children))
+        {
+            throw new RequestValidationException(
+                "Rezervacija mora imati najmanje jednu odraslu osobu, a broj djece ne može biti negativan.");
+        }
+
+        var cabin = await dbContext.Cabins
+            .Where(CabinVisibilityRules.PubliclyVisible)
             .SingleOrDefaultAsync(x => x.Id == request.CabinId, cancellationToken)
             ?? throw new ResourceNotFoundException("Vikendica nije pronađena.");
+
         if (!await dbContext.Users.AnyAsync(x => x.Id == guestId && x.IsActive, cancellationToken))
             throw new ResourceNotFoundException("Gost nije pronađen.");
-        if (request.Adults + request.Children > cabin.MaxAdults + cabin.MaxChildren)
-            throw new RequestValidationException("Broj gostiju prelazi kapacitet vikendice.");
+
+        if (!ReservationCreationRules.FitsCabinCapacity(
+                request.Adults,
+                request.Children,
+                cabin.MaxAdults,
+                cabin.MaxChildren))
+        {
+            if (request.Adults > cabin.MaxAdults)
+            {
+                throw new RequestValidationException(
+                    $"Vikendica prima najviše {cabin.MaxAdults} odraslih osoba.");
+            }
+
+            throw new RequestValidationException(
+                $"Vikendica prima najviše {cabin.MaxChildren} djece.");
+        }
 
         var overlaps = await dbContext.Reservations.AnyAsync(x => x.CabinId == request.CabinId &&
             x.Status != ReservationStatus.Cancelled && x.Status != ReservationStatus.Rejected &&

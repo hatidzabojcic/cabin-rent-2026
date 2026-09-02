@@ -6,7 +6,6 @@ using CabinRent.Services.Exceptions;
 namespace CabinRent.API.Infrastructure;
 
 public sealed class ApiExceptionHandler(
-    IProblemDetailsService problemDetailsService,
     ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
@@ -32,16 +31,29 @@ public sealed class ApiExceptionHandler(
         else
             logger.LogWarning(exception, "API request rejected with status {Status} for {Method} {Path}. TraceId: {TraceId}",
                 status, httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
-        httpContext.Response.StatusCode = status;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        var problemDetails = new ProblemDetails
         {
-            HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails
+            Status = status,
+            Title = status switch
             {
-                Status = status,
-                Title = status == 500 ? "Dogodila se neočekivana greška." : exception.Message
+                StatusCodes.Status400BadRequest => "Neispravan zahtjev",
+                StatusCodes.Status403Forbidden => "Pristup nije dozvoljen",
+                StatusCodes.Status404NotFound => "Podatak nije pronađen",
+                StatusCodes.Status409Conflict => "Zahtjev nije moguće izvršiti",
+                StatusCodes.Status500InternalServerError =>
+                    "Dogodila se neočekivana greška.",
+                _ => "Zahtjev nije uspješno obrađen"
             },
-            Exception = exception
-        });
+            Detail = status == StatusCodes.Status500InternalServerError
+                ? null
+                : exception.Message
+        };
+
+        problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        httpContext.Response.StatusCode = status;
+        httpContext.Response.ContentType = "application/problem+json";
+        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+        return true;
     }
 }
