@@ -14,7 +14,7 @@ public sealed class ReviewsController(IReviewService service) : ControllerBase
 {
     [HttpGet]
     [AllowAnonymous]
-    public Task<PagedResult<ReviewDto>> Get([FromQuery] PageRequest paging, [FromQuery] int? cabinId, CancellationToken cancellationToken) =>
+    public Task<PagedResult<PublicReviewDto>> Get([FromQuery] PageRequest paging, [FromQuery] int? cabinId, CancellationToken cancellationToken) =>
         service.GetAsync(paging, cabinId, true, cancellationToken);
 
     [HttpGet("mine")]

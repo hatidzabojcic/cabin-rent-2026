@@ -55,7 +55,7 @@ public interface IReservationService
 
 public interface IReviewService
 {
-    Task<PagedResult<ReviewDto>> GetAsync(PageRequest paging, int? cabinId, bool? approved, CancellationToken cancellationToken = default);
+    Task<PagedResult<PublicReviewDto>> GetAsync(PageRequest paging, int? cabinId, bool? approved, CancellationToken cancellationToken = default);
     Task<PagedResult<ReviewDto>> GetMineAsync(PageRequest paging, int guestId, CancellationToken cancellationToken = default);
     Task<PagedResult<ReviewDto>> GetManagedAsync(PageRequest paging, int? ownerId, int? cabinId, int? rating, bool? approved, string? search, CancellationToken cancellationToken = default);
     Task<ReviewDto> CreateAsync(CreateReviewRequest request, int guestId, CancellationToken cancellationToken = default);

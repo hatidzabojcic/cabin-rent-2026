@@ -460,14 +460,14 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
 
 public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
 {
-    public Task<PagedResult<ReviewDto>> GetAsync(PageRequest paging, int? cabinId, bool? approved, CancellationToken cancellationToken = default)
+    public Task<PagedResult<PublicReviewDto>> GetAsync(PageRequest paging, int? cabinId, bool? approved, CancellationToken cancellationToken = default)
     {
         var query = dbContext.Reviews.AsNoTracking()
             .Where(x => x.Cabin.IsActive && x.Cabin.Owner.IsActive)
             .AsQueryable();
         if (cabinId.HasValue) query = query.Where(x => x.CabinId == cabinId);
         if (approved.HasValue) query = query.Where(x => x.IsApproved == approved);
-        return query.OrderByDescending(x => x.CreatedAtUtc).Select(Projection())
+        return query.OrderByDescending(x => x.CreatedAtUtc).Select(PublicProjection())
             .ToPagedResultAsync(paging, cancellationToken);
     }
 
@@ -551,6 +551,18 @@ public sealed class ReviewService(CabinRentDbContext dbContext) : IReviewService
         return true;
     }
 
+    private static System.Linq.Expressions.Expression<Func<Review, PublicReviewDto>>
+    PublicProjection() => x =>
+        new PublicReviewDto(
+            x.Id,
+            x.ReservationId,
+            x.CabinId,
+            x.Cabin.Name,
+            x.Guest.FirstName + " " + x.Guest.LastName,
+            x.Rating,
+            x.Comment,
+            x.IsApproved,
+            x.CreatedAtUtc);
     private static System.Linq.Expressions.Expression<Func<Review, ReviewDto>> Projection() => x =>
         new ReviewDto(x.Id, x.ReservationId, x.CabinId, x.Cabin.Name, x.GuestId,
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Rating, x.Comment, x.IsApproved, x.CreatedAtUtc);

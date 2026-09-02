@@ -2,6 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CabinRent.Model.Reviews;
 
+public sealed record PublicReviewDto(
+    int Id,
+    int ReservationId,
+    int CabinId,
+    string CabinName,
+    string GuestName,
+    int Rating,
+    string? Comment,
+    bool IsApproved,
+    DateTime CreatedAtUtc
+);
 public sealed record ReviewDto(
     int Id, int ReservationId, int CabinId, string CabinName, int GuestId,
     string GuestName, string GuestEmail, int Rating, string? Comment, bool IsApproved, DateTime CreatedAtUtc);
