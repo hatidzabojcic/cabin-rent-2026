@@ -283,6 +283,14 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         if (reservation is null) return null;
         if (!isAdmin && reservation.Cabin.OwnerId != actorId) throw new ForbiddenOperationException("Nemate pristup ovoj rezervaciji.");
         if (reservation.Status == status) return await GetByIdAsync(id, cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (status == ReservationStatus.Completed &&
+            !ReservationStatusRules.CanComplete(reservation.CheckOut, today))
+        {
+            throw new BusinessRuleException(
+                "Rezervaciju nije moguće označiti kao završenu prije datuma odlaska.");
+        }
         if (status == ReservationStatus.Cancelled && reservation.Payment?.Status == PaymentStatus.Paid)
             throw new BusinessRuleException("Plaćena rezervacija mora biti otkazana kroz Stripe refund tok.");
         if (!ReservationStatusRules.CanTransition(reservation.Status, status))

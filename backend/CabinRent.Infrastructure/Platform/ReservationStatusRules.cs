@@ -15,6 +15,9 @@ public static class ReservationStatusRules
             _ => false
         };
 
+    public static bool CanComplete(DateOnly checkOut, DateOnly today) =>
+        checkOut <= today;
+
     public static IReadOnlyCollection<ReservationStatus> AllowedFrom(ReservationStatus current) =>
         current switch
         {

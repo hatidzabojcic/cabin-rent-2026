@@ -58,4 +58,34 @@ public sealed class ReservationStatusRulesTests
         ReservationStatus status, PaymentStatus paymentStatus, int daysUntilCheckIn) =>
         Assert.False(ReservationStatusRules.CanGuestReschedule(
             status, new DateOnly(2026, 9, 1).AddDays(daysUntilCheckIn), new DateOnly(2026, 9, 1), paymentStatus));
+
+    [Fact]
+    public void Stay_can_be_completed_on_check_out_date()
+    {
+        var result = ReservationStatusRules.CanComplete(
+            new DateOnly(2026, 9, 5),
+            new DateOnly(2026, 9, 5));
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void Stay_can_be_completed_after_check_out_date()
+    {
+        var result = ReservationStatusRules.CanComplete(
+            new DateOnly(2026, 9, 5),
+            new DateOnly(2026, 9, 6));
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void Stay_cannot_be_completed_before_check_out_date()
+    {
+        var result = ReservationStatusRules.CanComplete(
+            new DateOnly(2026, 9, 5),
+            new DateOnly(2026, 9, 4));
+
+        Assert.False(result);
+    }
 }
