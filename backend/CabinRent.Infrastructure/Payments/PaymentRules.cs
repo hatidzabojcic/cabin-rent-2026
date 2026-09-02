@@ -4,9 +4,9 @@ namespace CabinRent.Infrastructure.Payments;
 
 public static class PaymentRules
 {
-    public static bool CanStartPayment(ReservationStatus reservationStatus, PaymentStatus? paymentStatus, DateOnly checkOut, DateOnly today) =>
+    public static bool CanStartPayment(ReservationStatus reservationStatus, PaymentStatus? paymentStatus, DateOnly checkIn, DateOnly today) =>
         reservationStatus == ReservationStatus.Confirmed &&
-        checkOut > today &&
+        checkIn > today &&
         paymentStatus is not PaymentStatus.Paid and not PaymentStatus.Refunded;
 
     public static long ToMinorUnits(decimal amount) =>

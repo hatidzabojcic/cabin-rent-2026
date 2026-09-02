@@ -28,7 +28,7 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         if (reservation.GuestId != guestId)
             throw new ForbiddenOperationException("Možete platiti samo vlastitu rezervaciju.");
         var payment = reservation.Payment;
-        if (!PaymentRules.CanStartPayment(reservation.Status, payment?.Status, reservation.CheckOut, DateOnly.FromDateTime(DateTime.UtcNow)))
+        if (!PaymentRules.CanStartPayment(reservation.Status, payment?.Status, reservation.CheckIn, DateOnly.FromDateTime(DateTime.UtcNow)))
             throw new BusinessRuleException(payment?.Status switch
             {
                 PaymentStatus.Paid => "Rezervacija je već plaćena.",

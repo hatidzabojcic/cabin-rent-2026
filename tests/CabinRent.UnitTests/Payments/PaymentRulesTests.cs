@@ -7,35 +7,72 @@ namespace CabinRent.UnitTests.Payments;
 public sealed class PaymentRulesTests
 {
     [Fact]
-    public void Confirmed_future_unpaid_reservation_can_be_paid() =>
-        Assert.True(PaymentRules.CanStartPayment(
+    public void Confirmed_reservation_with_future_check_in_can_be_paid()
+    {
+        var result = PaymentRules.CanStartPayment(
             ReservationStatus.Confirmed,
             PaymentStatus.Pending,
             new DateOnly(2026, 9, 5),
-            new DateOnly(2026, 8, 18)));
+            new DateOnly(2026, 9, 1));
 
-    [Theory]
-    [InlineData(ReservationStatus.Pending, PaymentStatus.Pending)]
-    [InlineData(ReservationStatus.Cancelled, PaymentStatus.Pending)]
-    [InlineData(ReservationStatus.Completed, PaymentStatus.Pending)]
-    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Paid)]
-    [InlineData(ReservationStatus.Confirmed, PaymentStatus.Refunded)]
-    public void Invalid_reservation_or_payment_status_cannot_start_payment(
-        ReservationStatus reservationStatus,
-        PaymentStatus paymentStatus) =>
-        Assert.False(PaymentRules.CanStartPayment(
-            reservationStatus,
-            paymentStatus,
-            new DateOnly(2026, 9, 5),
-            new DateOnly(2026, 8, 18)));
+        Assert.True(result);
+    }
 
     [Fact]
-    public void Past_reservation_cannot_be_paid() =>
-        Assert.False(PaymentRules.CanStartPayment(
+    public void Reservation_cannot_be_paid_on_check_in_date()
+    {
+        var result = PaymentRules.CanStartPayment(
             ReservationStatus.Confirmed,
             PaymentStatus.Pending,
-            new DateOnly(2026, 8, 18),
-            new DateOnly(2026, 8, 18)));
+            new DateOnly(2026, 9, 1),
+            new DateOnly(2026, 9, 1));
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void Reservation_cannot_be_paid_after_check_in()
+    {
+        var result = PaymentRules.CanStartPayment(
+            ReservationStatus.Confirmed,
+            PaymentStatus.Pending,
+            new DateOnly(2026, 8, 30),
+            new DateOnly(2026, 9, 1));
+
+        Assert.False(result);
+    }
+
+    [Theory]
+    [InlineData(ReservationStatus.Pending)]
+    [InlineData(ReservationStatus.Cancelled)]
+    [InlineData(ReservationStatus.Rejected)]
+    [InlineData(ReservationStatus.Completed)]
+    public void Reservation_that_is_not_confirmed_cannot_be_paid(
+        ReservationStatus reservationStatus)
+    {
+        var result = PaymentRules.CanStartPayment(
+            reservationStatus,
+            PaymentStatus.Pending,
+            new DateOnly(2026, 9, 5),
+            new DateOnly(2026, 9, 1));
+
+        Assert.False(result);
+    }
+
+    [Theory]
+    [InlineData(PaymentStatus.Paid)]
+    [InlineData(PaymentStatus.Refunded)]
+    public void Paid_or_refunded_reservation_cannot_be_paid_again(
+        PaymentStatus paymentStatus)
+    {
+        var result = PaymentRules.CanStartPayment(
+            ReservationStatus.Confirmed,
+            paymentStatus,
+            new DateOnly(2026, 9, 5),
+            new DateOnly(2026, 9, 1));
+
+        Assert.False(result);
+    }
 
     [Theory]
     [InlineData("1200.00", 120000)]
