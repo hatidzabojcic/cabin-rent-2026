@@ -95,7 +95,59 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     );
   }
 
+  Future<bool> _confirmPayment() async {
+    final currency = _reservation.paymentCurrency == 'BAM'
+        ? 'KM'
+        : _reservation.paymentCurrency ?? 'KM';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Potvrda plaćanja'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Da li želite pokrenuti plaćanje za sljedeću rezervaciju?',
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _reservation.cabinName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text('Rezervacija: ${_reservation.confirmationCode}'),
+            const SizedBox(height: 6),
+            Text(
+              'Iznos za plaćanje: '
+              '${_reservation.remainingAmount.toStringAsFixed(2)} $currency',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Nastavi na plaćanje'),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed ?? false;
+  }
+
   Future<void> _pay() async {
+    final confirmed = await _confirmPayment();
+
+    if (!confirmed || !mounted) return;
+
     final payments = context.read<PaymentsController>();
     final result = await payments.pay(_reservation.id);
     if (!mounted) return;
