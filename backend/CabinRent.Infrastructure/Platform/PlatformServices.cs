@@ -118,13 +118,11 @@ public sealed class PlatformQueryService(
 
         var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null) return null;
+        var statusChanged = user.IsActive != isActive;
         user.IsActive = isActive;
         user.UpdatedAtUtc = DateTime.UtcNow;
-        if (!isActive)
-        {
-            var refreshTokens = await dbContext.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ToListAsync(cancellationToken);
-            foreach (var token in refreshTokens) token.RevokedAtUtc = DateTime.UtcNow;
-        }
+        if (statusChanged)
+            await InvalidateUserSessionsAsync(user, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return await dbContext.Users.AsNoTracking().Where(x => x.Id == id).Select(ManagedUserProjection()).SingleAsync(cancellationToken);
     }
@@ -168,6 +166,16 @@ public sealed class PlatformQueryService(
             throw new BusinessRuleException("Email adresa ili korisnicko ime vec postoji.");
         var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
             ?? throw new ResourceNotFoundException("Uloga nije pronadjena.");
+        var passwordChanged = !string.IsNullOrWhiteSpace(request.Password);
+
+        var roleChanged =
+            user.UserRoles.Count != 1 ||
+            user.UserRoles.All(x => x.RoleId != role.Id);
+        var statusChanged = user.IsActive != request.IsActive;
+        var invalidateSessions = UserManagementRules.RequiresSessionInvalidation(
+                passwordChanged,
+                roleChanged,
+                statusChanged);
         user.FirstName = request.FirstName.Trim();
         user.LastName = request.LastName.Trim();
         user.Email = email;
@@ -178,11 +186,8 @@ public sealed class PlatformQueryService(
         if (!string.IsNullOrWhiteSpace(request.Password)) user.PasswordHash = PasswordHash.Create(request.Password);
         dbContext.Set<UserRole>().RemoveRange(user.UserRoles);
         user.UserRoles = [new UserRole { UserId = user.Id, RoleId = role.Id }];
-        if (!user.IsActive)
-        {
-            var tokens = await dbContext.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ToListAsync(cancellationToken);
-            foreach (var token in tokens) token.RevokedAtUtc = DateTime.UtcNow;
-        }
+        if (invalidateSessions)
+            await InvalidateUserSessionsAsync(user, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return await dbContext.Users.AsNoTracking().Where(x => x.Id == id)
             .Select(ManagedUserProjection()).SingleAsync(cancellationToken);
@@ -202,6 +207,21 @@ public sealed class PlatformQueryService(
         return true;
     }
 
+    private async Task InvalidateUserSessionsAsync(
+    User user,
+    CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        user.TokenVersion++;
+
+        var activeTokens = await dbContext.RefreshTokens
+            .Where(x => x.UserId == user.Id && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in activeTokens)
+            token.RevokedAtUtc = now;
+    }
     private static System.Linq.Expressions.Expression<Func<User, UserDto>> UserProjection() => x =>
         new UserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
             x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.ProfileImageUrl);
