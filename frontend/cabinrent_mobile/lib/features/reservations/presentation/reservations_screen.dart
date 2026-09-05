@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../domain/reservation.dart';
 import 'reservations_controller.dart';
 import 'reservation_details_screen.dart';
+import 'cancellation_reason_dialog.dart';
 import '../../reviews/presentation/review_form_screen.dart';
 import '../../reviews/presentation/reviews_controller.dart';
 
@@ -160,27 +161,12 @@ class _ReservationCard extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Otkazati rezervaciju?'),
-                          content: Text(
-                            'Želite li otkazati ${reservation.confirmationCode}?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Ne'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('Da, otkaži'),
-                            ),
-                          ],
-                        ),
+                      final reason = await showCancellationReasonDialog(
+                        context,
+                        reservation,
                       );
-                      if (confirmed == true) {
-                        final ok = await c.cancel(reservation.id);
+                      if (reason != null) {
+                        final ok = await c.cancel(reservation.id, reason);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(

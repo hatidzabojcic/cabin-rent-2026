@@ -60,7 +60,14 @@ class Reservation {
   final String? paymentStatus;
   final String? paymentCurrency, specialRequests;
   final DateTime? paidAtUtc, refundedAtUtc;
-  bool get canCancel => status == 'Pending' || status == 'Confirmed';
+  bool get canCancel {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final checkInDate = DateTime(checkIn.year, checkIn.month, checkIn.day);
+    return (status == 'Pending' || status == 'Confirmed') &&
+        checkInDate.isAfter(today);
+  }
+
   bool get canReview => status == 'Completed';
   bool get canPay {
     final now = DateTime.now();
@@ -72,6 +79,7 @@ class Reservation {
         paymentStatus != 'Refunded' &&
         checkInDate.isAfter(today);
   }
+
   bool get canReschedule {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

@@ -24,14 +24,17 @@ class ReservationsController extends ChangeNotifier {
     }
   }
 
-  Future<bool> cancel(int id) async {
+  Future<bool> cancel(int id, String reason) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
     try {
-      final updated = await _repository.cancel(id);
+      final updated = await _repository.cancel(id, reason);
       reservations = reservations.map((x) => x.id == id ? updated : x).toList();
       return true;
+    } on ApiException catch (error) {
+      errorMessage = error.message;
+      return false;
     } catch (_) {
       errorMessage = 'Rezervaciju nije moguće otkazati.';
       return false;

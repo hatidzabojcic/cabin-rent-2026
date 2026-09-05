@@ -193,4 +193,40 @@ void main() {
     expect(reservation.nights, 3);
     expect(reservation.totalPrice, 900);
   });
+
+  test('cancels reservation with the guest reason', () async {
+    late http.Request capturedRequest;
+    final client = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response(
+        jsonEncode({
+          'id': 14,
+          'confirmationCode': 'CR-TEST-014',
+          'cabinId': 2,
+          'cabinName': 'Neretva retreat',
+          'checkIn': '2099-10-02',
+          'checkOut': '2099-10-05',
+          'adults': 2,
+          'children': 0,
+          'pricePerNight': 220,
+          'totalPrice': 660,
+          'status': 'Cancelled',
+          'paymentStatus': 'Pending',
+          'paidAmount': 0,
+        }),
+        200,
+      );
+    });
+    final api = ApiClient(client: client)..accessToken = 'guest-token';
+
+    final reservation = await ReservationsRepository(
+      api,
+    ).cancel(14, '  Promijenjeni planovi putovanja.  ');
+    final body = jsonDecode(capturedRequest.body) as Map<String, dynamic>;
+
+    expect(capturedRequest.method, 'PATCH');
+    expect(capturedRequest.url.path, '/api/reservations/14/cancel');
+    expect(body, {'reason': 'Promijenjeni planovi putovanja.'});
+    expect(reservation.status, 'Cancelled');
+  });
 }

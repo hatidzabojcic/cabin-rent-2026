@@ -29,6 +29,12 @@ public sealed class UpdateReservationStatusRequest
     [MaxLength(500)] public string? Reason { get; init; }
 }
 
+public sealed class CancelReservationRequest
+{
+    [Required, StringLength(500, MinimumLength = 3)]
+    public required string Reason { get; init; }
+}
+
 public sealed class RescheduleReservationRequest
 {
     public DateOnly CheckIn { get; init; }

@@ -11,9 +11,14 @@ class ReservationsRepository {
   Future<Reservation> getById(int id) async => Reservation.fromJson(
     await _api.getObject('/api/reservations/$id', authenticated: true),
   );
-  Future<Reservation> cancel(int id) async => Reservation.fromJson(
-    await _api.patch('/api/reservations/$id/cancel', authenticated: true),
-  );
+  Future<Reservation> cancel(int id, String reason) async =>
+      Reservation.fromJson(
+        await _api.patch(
+          '/api/reservations/$id/cancel',
+          authenticated: true,
+          body: {'reason': reason.trim()},
+        ),
+      );
 
   Future<Reservation> reschedule({
     required int id,

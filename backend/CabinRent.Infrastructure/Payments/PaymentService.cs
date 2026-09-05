@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using CabinRent.Model.Notifications;
 using System.Data;
 using CabinRent.Infrastructure.Platform;
+using CabinRent.Services.Exceptions;
 
 namespace CabinRent.Infrastructure.Payments;
 
@@ -131,8 +132,15 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         int actorId,
         bool isAdmin,
         bool isOwner,
+        string? reason = null,
         CancellationToken cancellationToken = default)
     {
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (!isAdmin && !isOwner && (normalizedReason is null || normalizedReason.Length < 3))
+            throw new RequestValidationException("Razlog otkazivanja mora sadržavati najmanje 3 znaka.");
+        if (normalizedReason?.Length > 500)
+            throw new RequestValidationException("Razlog otkazivanja može sadržavati najviše 500 znakova.");
+
         var snapshot = await dbContext.Reservations.AsNoTracking()
             .Where(x => x.Id == reservationId)
             .Select(x => new
@@ -191,9 +199,9 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         reservation.UpdatedAtUtc = DateTime.UtcNow;
         reservation.StatusChangedByUserId = actorId;
         reservation.StatusChangedAtUtc = DateTime.UtcNow;
-        reservation.StatusChangeReason = refund is null
+        reservation.StatusChangeReason = normalizedReason ?? (refund is null
             ? "Rezervacija je otkazana."
-            : "Rezervacija je otkazana i izvršen je povrat sredstava.";
+            : "Rezervacija je otkazana i izvršen je povrat sredstava.");
         if (refund is not null && reservation.Payment is not null)
         {
             reservation.Payment.Status = PaymentStatus.Refunded;

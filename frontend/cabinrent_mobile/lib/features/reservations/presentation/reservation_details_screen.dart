@@ -5,6 +5,7 @@ import '../../payments/presentation/payments_controller.dart';
 import '../../reviews/presentation/review_form_screen.dart';
 import '../../reviews/presentation/reviews_controller.dart';
 import '../domain/reservation.dart';
+import 'cancellation_reason_dialog.dart';
 import 'reservations_controller.dart';
 import 'reservation_reschedule_screen.dart';
 
@@ -23,31 +24,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   bool _isRefreshing = false;
 
   Future<void> _cancel() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Otkazati rezervaciju?'),
-        content: Text(
-          _reservation.paymentStatus == 'Paid'
-              ? 'Otkazivanjem rezervacije ${_reservation.confirmationCode} puni uplaćeni iznos bit će vraćen putem Stripea.'
-              : 'Želite li otkazati rezervaciju ${_reservation.confirmationCode}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Ne'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Da, otkaži'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    final reason = await showCancellationReasonDialog(context, _reservation);
+    if (reason == null || !mounted) return;
 
     final controller = context.read<ReservationsController>();
-    final success = await controller.cancel(_reservation.id);
+    final success = await controller.cancel(_reservation.id, reason);
     if (!mounted) return;
     if (success) {
       setState(() {

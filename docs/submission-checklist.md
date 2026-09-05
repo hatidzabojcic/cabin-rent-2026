@@ -33,6 +33,8 @@ flutter test
 
 ## Ručna provjera
 
+> Napomena: nakon implementacije svih stavki iz feedbacka obavezno ručno proći kroz mobilnu i desktop aplikaciju te provjeriti kompletne korisničke tokove prije izrade finalnog releasea.
+
 - [ ] Admin: korisnici/izdavači, šifrarnici, novosti, recenzije i izvještaji.
 - [ ] Owner: vikendice i galerije, rezervacije, statusi i obavijesti.
 - [ ] Guest: registracija, profil, pretraga, detalji, favoriti, preporuke, rezervacija, plaćanje, promjena termina, otkazivanje/refund, obavijesti i recenzija.

@@ -1,6 +1,7 @@
 using CabinRent.Infrastructure.Payments;
 using CabinRent.Infrastructure.Persistence;
 using CabinRent.Services.Payments;
+using CabinRent.Services.Exceptions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -86,16 +87,37 @@ public sealed class PaymentWebhookTests
         var service = new PaymentService(fixture.Context, gateway);
         var reservation = await fixture.Context.Reservations.SingleAsync();
 
-        Assert.True(await service.CancelReservationAsync(reservation.Id, reservation.GuestId, false, false));
-        Assert.True(await service.CancelReservationAsync(reservation.Id, reservation.GuestId, false, false));
+        const string reason = "Promijenjeni planovi putovanja.";
+        Assert.True(await service.CancelReservationAsync(reservation.Id, reservation.GuestId, false, false, reason));
+        Assert.True(await service.CancelReservationAsync(reservation.Id, reservation.GuestId, false, false, reason));
 
         var payment = await fixture.Context.Payments.SingleAsync();
-        Assert.Equal(ReservationStatus.Cancelled, (await fixture.Context.Reservations.SingleAsync()).Status);
+        var cancelledReservation = await fixture.Context.Reservations.SingleAsync();
+        Assert.Equal(ReservationStatus.Cancelled, cancelledReservation.Status);
+        Assert.Equal(reason, cancelledReservation.StatusChangeReason);
         Assert.Equal(PaymentStatus.Refunded, payment.Status);
         Assert.Equal(1200m, payment.RefundedAmount);
         Assert.Equal("re_test", payment.RefundReference);
         Assert.Equal(1, gateway.RefundCalls);
         Assert.Equal(2, await fixture.Context.NotificationOutbox.CountAsync());
+    }
+
+    [Fact]
+    public async Task Guest_cancellation_requires_a_meaningful_reason()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var service = new PaymentService(fixture.Context, new FakePaymentGateway());
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+
+        var exception = await Assert.ThrowsAsync<RequestValidationException>(() =>
+            service.CancelReservationAsync(
+                reservation.Id,
+                reservation.GuestId,
+                isAdmin: false,
+                isOwner: false,
+                reason: "  "));
+
+        Assert.Contains("najmanje 3 znaka", exception.Message);
     }
 
     private sealed class FakePaymentGateway(

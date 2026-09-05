@@ -48,7 +48,7 @@ public sealed class ReservationsController(IReservationService service, IPayment
         if (string.Equals(request.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
         {
             var cancelled = await paymentService.CancelReservationAsync(
-                id, User.GetUserId(), User.IsInRole("Admin"), User.IsInRole("Owner"), cancellationToken);
+                id, User.GetUserId(), User.IsInRole("Admin"), User.IsInRole("Owner"), request.Reason, cancellationToken);
             if (!cancelled) return NotFound();
             return Ok(await service.GetByIdAsync(id, cancellationToken));
         }
@@ -58,10 +58,18 @@ public sealed class ReservationsController(IReservationService service, IPayment
 
     [HttpPatch("{id:int}/cancel")]
     [Authorize(Roles = "Guest")]
-    public async Task<ActionResult<ReservationDto>> Cancel(int id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ReservationDto>> Cancel(
+        int id,
+        CancelReservationRequest request,
+        CancellationToken cancellationToken)
     {
         var cancelled = await paymentService.CancelReservationAsync(
-            id, User.GetUserId(), isAdmin: false, isOwner: false, cancellationToken);
+            id,
+            User.GetUserId(),
+            isAdmin: false,
+            isOwner: false,
+            reason: request.Reason,
+            cancellationToken: cancellationToken);
         if (!cancelled) return NotFound();
         return Ok(await service.GetByIdAsync(id, cancellationToken));
     }

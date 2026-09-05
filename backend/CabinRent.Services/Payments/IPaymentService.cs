@@ -6,7 +6,7 @@ public interface IPaymentService
 {
     Task<PaymentIntentDto> CreateIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default);
     Task<PaymentConfirmationDto> ConfirmIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default);
-    Task<bool> CancelReservationAsync(int reservationId, int actorId, bool isAdmin, bool isOwner, CancellationToken cancellationToken = default);
+    Task<bool> CancelReservationAsync(int reservationId, int actorId, bool isAdmin, bool isOwner, string? reason = null, CancellationToken cancellationToken = default);
     Task<PaymentWebhookResultDto> ProcessWebhookAsync(string payload, string signature, CancellationToken cancellationToken = default);
 }
 
