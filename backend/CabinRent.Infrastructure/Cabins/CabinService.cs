@@ -2,6 +2,7 @@ using CabinRent.Infrastructure.Persistence;
 using CabinRent.Model.Cabins;
 using CabinRent.Model.Common;
 using CabinRent.Services.Cabins;
+using CabinRent.Services.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinRent.Infrastructure.Cabins;
@@ -10,6 +11,12 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
 {
     public async Task<PagedResult<CabinDto>> GetAsync(CabinSearchRequest request, CancellationToken cancellationToken = default)
     {
+        var validationError = CabinSearchRules.GetValidationError(
+            request,
+            DateOnly.FromDateTime(DateTime.UtcNow));
+        if (validationError is not null)
+            throw new RequestValidationException(validationError);
+
         var page = Math.Max(request.Page, 1);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var query = dbContext.Cabins.AsNoTracking().Where(CabinVisibilityRules.PubliclyVisible);
