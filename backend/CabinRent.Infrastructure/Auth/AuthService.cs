@@ -10,6 +10,7 @@ using CabinRent.Services.Cabins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using CabinRent.Infrastructure.Platform;
 
 namespace CabinRent.Infrastructure.Auth;
 
@@ -34,7 +35,7 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
         if (await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
             throw new BusinessRuleException("Email adresa je već registrovana.");
 
-        var guestRole = await dbContext.Roles.SingleAsync(x => x.Name == "Guest", cancellationToken);
+        var guestRole = await dbContext.Roles.SingleAsync(x => x.Code == SystemRoleCodes.Guest, cancellationToken);
         var user = new User
         {
             FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), Email = email,
@@ -219,7 +220,7 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
     private AuthResponse BuildResponse(User user, string rawRefreshToken)
     {
         var expires = DateTime.UtcNow.AddMinutes(jwt.AccessTokenMinutes);
-        var roles = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray();
+        var roles = user.UserRoles.Select(x => x.Role.Code).OrderBy(x => x).ToArray();
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -235,7 +236,7 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
     }
 
     private IQueryable<User> UserQuery() => dbContext.Users.Include(x => x.UserRoles).ThenInclude(x => x.Role);
-    private static UserDto ToDto(User user) => new(user.Id, user.FirstName, user.LastName, user.Email, user.UserName, user.PhoneNumber, user.IsActive, user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray(), user.ProfileImageUrl);
+    private static UserDto ToDto(User user) => new(user.Id, user.FirstName, user.LastName, user.Email, user.UserName, user.PhoneNumber, user.IsActive, user.UserRoles.Select(x => x.Role.Code).OrderBy(x => x).ToArray(), user.ProfileImageUrl);
     private static string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

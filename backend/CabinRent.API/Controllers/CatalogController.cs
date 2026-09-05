@@ -105,12 +105,12 @@ public sealed class CatalogController(IPlatformQueryService service, IReferenceD
 
     [HttpPost("roles")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<RoleDto>> CreateRole(SaveRoleRequest request, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<RoleDto>> CreateRole(CreateRoleRequest request, CancellationToken cancellationToken) =>
         StatusCode(StatusCodes.Status201Created, await referenceDataService.CreateRoleAsync(request, cancellationToken));
 
     [HttpPut("roles/{id:int}")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<RoleDto>> UpdateRole(int id, SaveRoleRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<RoleDto>> UpdateRole(int id, UpdateRoleRequest request, CancellationToken cancellationToken)
     {
         var result = await referenceDataService.UpdateRoleAsync(id, request, cancellationToken);
         return result is null ? NotFound() : Ok(result);

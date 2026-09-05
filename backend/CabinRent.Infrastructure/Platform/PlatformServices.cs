@@ -75,8 +75,8 @@ public sealed class PlatformQueryService(
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
             var query = dbContext.Roles.AsNoTracking().AsQueryable();
-            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search));
-            return await query.OrderBy(x => x.Name).Select(x => new RoleDto(x.Id, x.Name, x.Description))
+            if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => x.Name.Contains(search) || x.Code.Contains(search));
+            return await query.OrderBy(x => x.Name).Select(x => new RoleDto(x.Id, x.Code, x.Name, x.Description))
                 .ToPagedResultAsync(paging, cancellationToken);
         }))!;
     }
@@ -89,7 +89,7 @@ public sealed class PlatformQueryService(
         var query = dbContext.Users.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(x => x.FirstName.Contains(search) || x.LastName.Contains(search) || x.UserName.Contains(search) || x.Email.Contains(search));
-        if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Name == role));
+        if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Code == role));
         return query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName).Select(UserProjection())
             .ToPagedResultAsync(paging, cancellationToken);
     }
@@ -105,7 +105,7 @@ public sealed class PlatformQueryService(
             var term = search.Trim();
             query = query.Where(x => x.FirstName.Contains(term) || x.LastName.Contains(term) || x.UserName.Contains(term) || x.Email.Contains(term));
         }
-        if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Name == role));
+        if (!string.IsNullOrWhiteSpace(role)) query = query.Where(x => x.UserRoles.Any(ur => ur.Role.Code == role));
         if (isActive.HasValue) query = query.Where(x => x.IsActive == isActive.Value);
         return query.OrderBy(x => x.LastName).ThenBy(x => x.FirstName)
             .Select(ManagedUserProjection()).ToPagedResultAsync(paging, cancellationToken);
@@ -135,7 +135,7 @@ public sealed class PlatformQueryService(
         var userName = request.UserName.Trim();
         if (await dbContext.Users.AnyAsync(x => x.Email == email || x.UserName == userName, cancellationToken))
             throw new BusinessRuleException("Email adresa ili korisnicko ime vec postoji.");
-        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
+        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Code == request.Role, cancellationToken)
             ?? throw new ResourceNotFoundException("Uloga nije pronadjena.");
         var user = new User
         {
@@ -164,7 +164,7 @@ public sealed class PlatformQueryService(
         var userName = request.UserName.Trim();
         if (await dbContext.Users.AnyAsync(x => x.Id != id && (x.Email == email || x.UserName == userName), cancellationToken))
             throw new BusinessRuleException("Email adresa ili korisnicko ime vec postoji.");
-        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Name == request.Role, cancellationToken)
+        var role = await dbContext.Roles.SingleOrDefaultAsync(x => x.Code == request.Role, cancellationToken)
             ?? throw new ResourceNotFoundException("Uloga nije pronadjena.");
         var passwordChanged = !string.IsNullOrWhiteSpace(request.Password);
 
@@ -224,11 +224,11 @@ public sealed class PlatformQueryService(
     }
     private static System.Linq.Expressions.Expression<Func<User, UserDto>> UserProjection() => x =>
         new UserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
-            x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.ProfileImageUrl);
+            x.UserRoles.Select(ur => ur.Role.Code).OrderBy(code => code).ToList(), x.ProfileImageUrl);
 
     private static System.Linq.Expressions.Expression<Func<User, ManagedUserDto>> ManagedUserProjection() => x =>
         new ManagedUserDto(x.Id, x.FirstName, x.LastName, x.Email, x.UserName, x.PhoneNumber, x.IsActive,
-            x.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(), x.OwnedCabins.Count,
+            x.UserRoles.Select(ur => ur.Role.Code).OrderBy(code => code).ToList(), x.OwnedCabins.Count,
             x.OwnedCabins.SelectMany(cabin => cabin.Reservations).Count());
 }
 

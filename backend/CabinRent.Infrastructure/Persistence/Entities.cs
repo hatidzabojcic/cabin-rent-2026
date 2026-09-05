@@ -27,6 +27,7 @@ public sealed class User : Entity
 
 public sealed class Role : Entity
 {
+    public required string Code { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
     public ICollection<UserRole> UserRoles { get; set; } = [];

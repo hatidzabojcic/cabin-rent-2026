@@ -120,21 +120,46 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         return await DeleteEntityAsync<Amenity>(id, cancellationToken);
     }
 
-    public Task<RoleDto> CreateRoleAsync(SaveRoleRequest request, CancellationToken cancellationToken = default) =>
-        CreateNamedAsync<Role, RoleDto>(request.Name, request.Description,
-            (name, description) => new Role { Name = name, Description = description },
-            x => new RoleDto(x.Id, x.Name, x.Description), cancellationToken);
+    public async Task<RoleDto> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken = default)
+    {
+        var code = Required(request.Code, "Kod uloge");
+        var name = Required(request.Name, "Naziv uloge");
+        var normalizedCode = code.ToLowerInvariant();
+        if (await dbContext.Roles.AnyAsync(x => x.Code.ToLower() == normalizedCode || x.Name == name, cancellationToken))
+            throw new BusinessRuleException("Uloga sa istim kodom ili nazivom već postoji.");
 
-    public Task<RoleDto?> UpdateRoleAsync(int id, SaveRoleRequest request, CancellationToken cancellationToken = default) =>
-        UpdateNamedAsync<Role, RoleDto>(id, request.Name, request.Description,
-            (entity, name, description) => { entity.Name = name; entity.Description = description; },
-            x => new RoleDto(x.Id, x.Name, x.Description), cancellationToken);
+        var entity = new Role { Code = code, Name = name, Description = Optional(request.Description) };
+        dbContext.Roles.Add(entity);
+        await SaveChangesAsync(cancellationToken);
+        return ToRoleDto(entity);
+    }
+
+    public async Task<RoleDto?> UpdateRoleAsync(int id, UpdateRoleRequest request, CancellationToken cancellationToken = default)
+    {
+        var entity = await dbContext.Roles.FindAsync([id], cancellationToken);
+        if (entity is null) return null;
+        var name = Required(request.Name, "Naziv uloge");
+        if (await dbContext.Roles.AnyAsync(x => x.Id != id && x.Name == name, cancellationToken))
+            throw new BusinessRuleException("Uloga sa istim nazivom već postoji.");
+
+        entity.Name = name;
+        entity.Description = Optional(request.Description);
+        entity.UpdatedAtUtc = DateTime.UtcNow;
+        await SaveChangesAsync(cancellationToken);
+        return ToRoleDto(entity);
+    }
 
     public async Task<bool> DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
     {
+        var role = await dbContext.Roles.FindAsync([id], cancellationToken);
+        if (role is null) return false;
+        if (SystemRoleCodes.All.Contains(role.Code))
+            throw new BusinessRuleException("Sistemsku ulogu nije moguće obrisati.");
         if (await dbContext.Set<UserRole>().AnyAsync(x => x.RoleId == id, cancellationToken))
             throw new BusinessRuleException("Ulogu nije moguce obrisati jer je dodijeljena korisnicima.");
-        return await DeleteEntityAsync<Role>(id, cancellationToken);
+        dbContext.Roles.Remove(role);
+        await SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private async Task<TDto> CreateNamedAsync<TEntity, TDto>(string value, string? optional,
@@ -178,6 +203,8 @@ public sealed class ReferenceDataService(CabinRentDbContext dbContext, Reference
         string.IsNullOrWhiteSpace(value) ? throw new RequestValidationException($"{field} je obavezan.") : value.Trim();
 
     private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static RoleDto ToRoleDto(Role role) => new(role.Id, role.Code, role.Name, role.Description);
 
     private async Task SaveChangesAsync(CancellationToken cancellationToken)
     {

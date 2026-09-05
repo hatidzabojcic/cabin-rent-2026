@@ -296,6 +296,7 @@ class _ReferenceFormDialog extends StatefulWidget {
 class _ReferenceFormDialogState extends State<_ReferenceFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
+  late final TextEditingController _code;
   late final TextEditingController _secondary;
   List<ReferenceItem> _countries = [];
   int? _countryId;
@@ -307,6 +308,7 @@ class _ReferenceFormDialogState extends State<_ReferenceFormDialog> {
     super.initState();
     final item = widget.item;
     _name = TextEditingController(text: item?.name ?? '');
+    _code = TextEditingController(text: item?.code ?? '');
     _secondary = TextEditingController(
       text: switch (widget.kind) {
         ReferenceKind.countries => item?.isoCode ?? '',
@@ -323,6 +325,7 @@ class _ReferenceFormDialogState extends State<_ReferenceFormDialog> {
   @override
   void dispose() {
     _name.dispose();
+    _code.dispose();
     _secondary.dispose();
     super.dispose();
   }
@@ -353,6 +356,27 @@ class _ReferenceFormDialogState extends State<_ReferenceFormDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (widget.kind == ReferenceKind.roles) ...[
+              TextFormField(
+                controller: _code,
+                readOnly: widget.item != null,
+                decoration: InputDecoration(
+                  labelText: 'Sistemski kod',
+                  helperText: widget.item == null
+                      ? 'Nakon kreiranja kod se ne može mijenjati.'
+                      : 'Kod je nepromjenjiv i koristi se za autorizaciju.',
+                ),
+                validator: (value) {
+                  final code = value?.trim() ?? '';
+                  if (code.isEmpty) return 'Sistemski kod je obavezan.';
+                  if (!RegExp(r'^[A-Za-z][A-Za-z0-9_-]*$').hasMatch(code)) {
+                    return 'Koristite slova, brojeve, _ ili -; prvo mora biti slovo.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+            ],
             TextFormField(
               controller: _name,
               autofocus: true,
@@ -446,6 +470,7 @@ class _ReferenceFormDialogState extends State<_ReferenceFormDialog> {
           body['icon'] = secondary.isEmpty ? null : secondary;
         case ReferenceKind.roles:
           body['description'] = secondary.isEmpty ? null : secondary;
+          if (widget.item == null) body['code'] = _code.text.trim();
       }
       final repository = context.read<ReferenceDataRepository>();
       if (widget.item == null) {

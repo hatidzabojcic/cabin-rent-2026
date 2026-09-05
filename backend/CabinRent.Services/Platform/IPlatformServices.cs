@@ -38,8 +38,8 @@ public interface IReferenceDataService
     Task<AmenityDto> CreateAmenityAsync(SaveAmenityRequest request, CancellationToken cancellationToken = default);
     Task<AmenityDto?> UpdateAmenityAsync(int id, SaveAmenityRequest request, CancellationToken cancellationToken = default);
     Task<bool> DeleteAmenityAsync(int id, CancellationToken cancellationToken = default);
-    Task<RoleDto> CreateRoleAsync(SaveRoleRequest request, CancellationToken cancellationToken = default);
-    Task<RoleDto?> UpdateRoleAsync(int id, SaveRoleRequest request, CancellationToken cancellationToken = default);
+    Task<RoleDto> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken = default);
+    Task<RoleDto?> UpdateRoleAsync(int id, UpdateRoleRequest request, CancellationToken cancellationToken = default);
     Task<bool> DeleteRoleAsync(int id, CancellationToken cancellationToken = default);
 }
 

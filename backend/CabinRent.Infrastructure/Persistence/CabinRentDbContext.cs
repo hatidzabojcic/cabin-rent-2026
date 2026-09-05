@@ -31,6 +31,7 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
 
         modelBuilder.Entity<User>().HasIndex(x => x.Email).IsUnique();
         modelBuilder.Entity<User>().HasIndex(x => x.UserName).IsUnique();
+        modelBuilder.Entity<Role>().HasIndex(x => x.Code).IsUnique();
         modelBuilder.Entity<Role>().HasIndex(x => x.Name).IsUnique();
         modelBuilder.Entity<Country>().HasIndex(x => x.IsoCode).IsUnique();
         modelBuilder.Entity<CabinType>().HasIndex(x => x.Name).IsUnique();

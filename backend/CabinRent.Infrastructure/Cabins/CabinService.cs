@@ -1,4 +1,5 @@
 using CabinRent.Infrastructure.Persistence;
+using CabinRent.Infrastructure.Platform;
 using CabinRent.Model.Cabins;
 using CabinRent.Model.Common;
 using CabinRent.Services.Cabins;
@@ -135,7 +136,7 @@ public sealed class CabinService(CabinRentDbContext dbContext) : ICabinService
 
     private async Task ValidateReferencesAsync(SaveCabinRequest request, int ownerId, CancellationToken cancellationToken)
     {
-        if (!await dbContext.Users.AnyAsync(x => x.Id == ownerId && x.IsActive && x.UserRoles.Any(r => r.Role.Name == "Owner"), cancellationToken))
+        if (!await dbContext.Users.AnyAsync(x => x.Id == ownerId && x.IsActive && x.UserRoles.Any(r => r.Role.Code == SystemRoleCodes.Owner), cancellationToken))
             throw new RequestValidationException("Odabrani vlasnik nije validan Owner korisnik.");
         if (!await dbContext.Cities.AnyAsync(x => x.Id == request.CityId, cancellationToken))
             throw new RequestValidationException("Odabrani grad ne postoji.");

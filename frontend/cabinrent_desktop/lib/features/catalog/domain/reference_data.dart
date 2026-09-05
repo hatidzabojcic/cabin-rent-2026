@@ -22,6 +22,7 @@ class ReferenceItem {
   const ReferenceItem({
     required this.id,
     required this.name,
+    this.code,
     this.isoCode,
     this.postalCode,
     this.countryId,
@@ -36,6 +37,7 @@ class ReferenceItem {
   ) => ReferenceItem(
     id: json['id'] as int,
     name: json['name'] as String,
+    code: json['code'] as String?,
     isoCode: json['isoCode'] as String?,
     postalCode: json['postalCode'] as String?,
     countryId: json['countryId'] as int?,
@@ -46,6 +48,7 @@ class ReferenceItem {
 
   final int id;
   final String name;
+  final String? code;
   final String? isoCode;
   final String? postalCode;
   final int? countryId;
@@ -54,6 +57,9 @@ class ReferenceItem {
   final String? icon;
 
   String get details =>
+      (code == null
+          ? null
+          : [code, description].whereType<String>().join(' - ')) ??
       isoCode ??
       [postalCode, countryName].whereType<String>().join(' - ').nullIfEmpty ??
       description ??

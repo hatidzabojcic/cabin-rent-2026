@@ -46,9 +46,9 @@ public static class DatabaseInitializer
         if (!await dbContext.Roles.AnyAsync(cancellationToken))
         {
             dbContext.Roles.AddRange(
-                new Role { Name = "Admin", Description = "Potpuni pristup sistemu" },
-                new Role { Name = "Owner", Description = "Upravlja vlastitim vikendicama i rezervacijama" },
-                new Role { Name = "Guest", Description = "Pretražuje i rezerviše vikendice" });
+                new Role { Code = "Admin", Name = "Administrator", Description = "Potpuni pristup sistemu" },
+                new Role { Code = "Owner", Name = "Izdavač", Description = "Upravlja vlastitim vikendicama i rezervacijama" },
+                new Role { Code = "Guest", Name = "Gost", Description = "Pretražuje i rezerviše vikendice" });
         }
 
         if (!await dbContext.Countries.AnyAsync(cancellationToken))
@@ -128,7 +128,7 @@ public static class DatabaseInitializer
             if (await dbContext.Users.AnyAsync(x => x.UserName == normalizedUserName, cancellationToken))
                 continue;
 
-            var role = await dbContext.Roles.SingleAsync(x => x.Name == account.RoleName, cancellationToken);
+            var role = await dbContext.Roles.SingleAsync(x => x.Code == account.RoleName, cancellationToken);
             dbContext.Users.Add(new User
             {
                 FirstName = account.FirstName,
