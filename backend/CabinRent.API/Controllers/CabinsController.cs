@@ -10,7 +10,10 @@ namespace CabinRent.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class CabinsController(ICabinService cabinService, ICabinImageService imageService) : ControllerBase
+public sealed class CabinsController(
+    ICabinService cabinService,
+    ICabinImageService imageService,
+    IAvailabilityBlockService availabilityBlockService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType<PagedResult<CabinDto>>(StatusCodes.Status200OK)]
@@ -99,4 +102,34 @@ public sealed class CabinsController(ICabinService cabinService, ICabinImageServ
     [Authorize(Roles = "Admin,Owner")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken) =>
         await cabinService.DeleteAsync(id, User.GetUserId(), User.IsInRole("Admin"), cancellationToken) ? NoContent() : NotFound();
+
+    [HttpGet("{id:int}/availability-blocks")]
+    [Authorize(Roles = "Admin,Owner")]
+    public Task<IReadOnlyCollection<AvailabilityBlockDto>> GetAvailabilityBlocks(int id, CancellationToken cancellationToken) =>
+        availabilityBlockService.GetAsync(id, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
+
+    [HttpPost("{id:int}/availability-blocks")]
+    [Authorize(Roles = "Admin,Owner")]
+    public async Task<ActionResult<AvailabilityBlockDto>> CreateAvailabilityBlock(
+        int id, SaveAvailabilityBlockRequest request, CancellationToken cancellationToken)
+    {
+        var block = await availabilityBlockService.CreateAsync(id, request, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, block);
+    }
+
+    [HttpPut("{id:int}/availability-blocks/{blockId:int}")]
+    [Authorize(Roles = "Admin,Owner")]
+    public async Task<ActionResult<AvailabilityBlockDto>> UpdateAvailabilityBlock(
+        int id, int blockId, SaveAvailabilityBlockRequest request, CancellationToken cancellationToken)
+    {
+        var block = await availabilityBlockService.UpdateAsync(id, blockId, request, User.GetUserId(), User.IsInRole("Admin"), cancellationToken);
+        return block is null ? NotFound() : Ok(block);
+    }
+
+    [HttpDelete("{id:int}/availability-blocks/{blockId:int}")]
+    [Authorize(Roles = "Admin,Owner")]
+    public async Task<IActionResult> DeleteAvailabilityBlock(int id, int blockId, CancellationToken cancellationToken) =>
+        await availabilityBlockService.DeleteAsync(id, blockId, User.GetUserId(), User.IsInRole("Admin"), cancellationToken)
+            ? NoContent()
+            : NotFound();
 }

@@ -7,6 +7,7 @@ import '../data/cabins_repository.dart';
 import '../domain/cabin.dart';
 import 'cabin_form_dialog.dart';
 import 'cabin_gallery_dialog.dart';
+import 'availability_blocks_dialog.dart';
 
 class CabinsScreen extends StatefulWidget {
   const CabinsScreen({super.key});
@@ -73,6 +74,12 @@ class _CabinsScreenState extends State<CabinsScreen> {
     );
     if (changed == true) await _load();
   }
+
+  Future<void> _openAvailabilityBlocks(Cabin cabin) => showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => AvailabilityBlocksDialog(cabin: cabin),
+  );
 
   Future<void> _toggleActive(Cabin cabin) async {
     final verb = cabin.isActive ? 'deaktivirati' : 'aktivirati';
@@ -211,6 +218,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
         showOwner: isAdmin,
         onEdit: () => _openForm(cabins[index]),
         onGallery: () => _openGallery(cabins[index]),
+        onAvailabilityBlocks: () => _openAvailabilityBlocks(cabins[index]),
         onToggleActive: () => _toggleActive(cabins[index]),
       ),
     );
@@ -223,12 +231,14 @@ class _CabinCard extends StatelessWidget {
     required this.showOwner,
     required this.onEdit,
     required this.onGallery,
+    required this.onAvailabilityBlocks,
     required this.onToggleActive,
   });
   final Cabin cabin;
   final bool showOwner;
   final VoidCallback onEdit;
   final VoidCallback onGallery;
+  final VoidCallback onAvailabilityBlocks;
   final VoidCallback onToggleActive;
 
   @override
@@ -286,6 +296,7 @@ class _CabinCard extends StatelessWidget {
                       onSelected: (value) {
                         if (value == 'edit') onEdit();
                         if (value == 'gallery') onGallery();
+                        if (value == 'availability') onAvailabilityBlocks();
                         if (value == 'active') onToggleActive();
                       },
                       itemBuilder: (_) => [
@@ -302,6 +313,14 @@ class _CabinCard extends StatelessWidget {
                           child: ListTile(
                             leading: Icon(Icons.photo_library_outlined),
                             title: Text('Galerija'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'availability',
+                          child: ListTile(
+                            leading: Icon(Icons.event_busy_outlined),
+                            title: Text('Blokirani termini'),
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),

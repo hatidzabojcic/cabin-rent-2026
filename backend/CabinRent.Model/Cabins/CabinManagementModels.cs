@@ -54,6 +54,20 @@ public sealed class SetCabinActiveRequest
     public bool IsActive { get; init; }
 }
 
+public sealed record AvailabilityBlockDto(
+    int Id,
+    int CabinId,
+    DateOnly From,
+    DateOnly To,
+    string Reason);
+
+public sealed class SaveAvailabilityBlockRequest
+{
+    public DateOnly From { get; init; }
+    public DateOnly To { get; init; }
+    [Required, MinLength(3), MaxLength(500)] public required string Reason { get; init; }
+}
+
 public sealed class UpdateCabinImageRequest
 {
     [MaxLength(300)] public string? AltText { get; init; }

@@ -121,6 +121,31 @@ class OwnerOption {
   final String name;
 }
 
+class AvailabilityBlock {
+  const AvailabilityBlock({
+    required this.id,
+    required this.cabinId,
+    required this.from,
+    required this.to,
+    required this.reason,
+  });
+
+  factory AvailabilityBlock.fromJson(Map<String, dynamic> json) =>
+      AvailabilityBlock(
+        id: json['id'] as int,
+        cabinId: json['cabinId'] as int,
+        from: DateTime.parse(json['from'] as String),
+        to: DateTime.parse(json['to'] as String),
+        reason: json['reason'] as String,
+      );
+
+  final int id;
+  final int cabinId;
+  final DateTime from;
+  final DateTime to;
+  final String reason;
+}
+
 class CabinFormData {
   CabinFormData({
     required this.name,

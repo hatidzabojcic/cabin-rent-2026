@@ -63,6 +63,58 @@ class CabinsRepository {
   Future<void> deleteImage(int cabinId, int imageId) =>
       _api.delete('/api/cabins/$cabinId/images/$imageId', authenticated: true);
 
+  Future<List<AvailabilityBlock>> getAvailabilityBlocks(int cabinId) async =>
+      (await _api.getList(
+        '/api/cabins/$cabinId/availability-blocks',
+        authenticated: true,
+      )).map((item) => AvailabilityBlock.fromJson(item as Map<String, dynamic>)).toList();
+
+  Future<AvailabilityBlock> createAvailabilityBlock(
+    int cabinId,
+    DateTime from,
+    DateTime to,
+    String reason,
+  ) async => AvailabilityBlock.fromJson(
+    await _api.post(
+      '/api/cabins/$cabinId/availability-blocks',
+      body: _availabilityBlockBody(from, to, reason),
+      authenticated: true,
+    ),
+  );
+
+  Future<AvailabilityBlock> updateAvailabilityBlock(
+    int cabinId,
+    int blockId,
+    DateTime from,
+    DateTime to,
+    String reason,
+  ) async => AvailabilityBlock.fromJson(
+    await _api.put(
+      '/api/cabins/$cabinId/availability-blocks/$blockId',
+      body: _availabilityBlockBody(from, to, reason),
+      authenticated: true,
+    ),
+  );
+
+  Future<void> deleteAvailabilityBlock(int cabinId, int blockId) =>
+      _api.delete(
+        '/api/cabins/$cabinId/availability-blocks/$blockId',
+        authenticated: true,
+      );
+
+  Map<String, dynamic> _availabilityBlockBody(
+    DateTime from,
+    DateTime to,
+    String reason,
+  ) => {
+    'from': _dateOnly(from),
+    'to': _dateOnly(to),
+    'reason': reason.trim(),
+  };
+
+  String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
   Future<List<CatalogOption>> getCities() => _catalog('/api/catalog/cities');
   Future<List<CatalogOption>> getCabinTypes() =>
       _catalog('/api/catalog/cabin-types');

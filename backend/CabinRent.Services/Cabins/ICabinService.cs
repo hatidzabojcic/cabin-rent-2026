@@ -28,3 +28,11 @@ public interface ICabinImageService
     Task<CabinImageDto?> UpdateAsync(int cabinId, int imageId, UpdateCabinImageRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(int cabinId, int imageId, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
 }
+
+public interface IAvailabilityBlockService
+{
+    Task<IReadOnlyCollection<AvailabilityBlockDto>> GetAsync(int cabinId, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
+    Task<AvailabilityBlockDto> CreateAsync(int cabinId, SaveAvailabilityBlockRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
+    Task<AvailabilityBlockDto?> UpdateAsync(int cabinId, int id, SaveAvailabilityBlockRequest request, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(int cabinId, int id, int actorId, bool isAdmin, CancellationToken cancellationToken = default);
+}
