@@ -11,16 +11,21 @@ class ApiClient {
 
   final http.Client _client;
   String? accessToken;
+  Future<bool> Function()? refreshAccessToken;
+  Future<bool>? _refreshInProgress;
 
   Future<Map<String, dynamic>> post(
     String path, {
     Object? body,
     bool authenticated = false,
   }) async {
-    final response = await _client.post(
-      _uri(path),
-      headers: _headers(authenticated),
-      body: body == null ? null : jsonEncode(body),
+    final response = await _send(
+      authenticated,
+      () => _client.post(
+        _uri(path),
+        headers: _headers(authenticated),
+        body: body == null ? null : jsonEncode(body),
+      ),
     );
     return _decodeObject(response);
   }
@@ -29,9 +34,9 @@ class ApiClient {
     String path, {
     bool authenticated = false,
   }) async {
-    final response = await _client.get(
-      _uri(path),
-      headers: _headers(authenticated),
+    final response = await _send(
+      authenticated,
+      () => _client.get(_uri(path), headers: _headers(authenticated)),
     );
     return _decodeObject(response);
   }
@@ -40,9 +45,9 @@ class ApiClient {
     String path, {
     bool authenticated = false,
   }) async {
-    final response = await _client.get(
-      _uri(path),
-      headers: _headers(authenticated),
+    final response = await _send(
+      authenticated,
+      () => _client.get(_uri(path), headers: _headers(authenticated)),
     );
     return _decodeList(response);
   }
@@ -59,10 +64,13 @@ class ApiClient {
     required Object body,
     bool authenticated = false,
   }) async {
-    final response = await _client.put(
-      _uri(path),
-      headers: _headers(authenticated),
-      body: jsonEncode(body),
+    final response = await _send(
+      authenticated,
+      () => _client.put(
+        _uri(path),
+        headers: _headers(authenticated),
+        body: jsonEncode(body),
+      ),
     );
     return _decodeObject(response);
   }
@@ -72,10 +80,13 @@ class ApiClient {
     required Object body,
     bool authenticated = false,
   }) async {
-    final response = await _client.patch(
-      _uri(path),
-      headers: _headers(authenticated),
-      body: jsonEncode(body),
+    final response = await _send(
+      authenticated,
+      () => _client.patch(
+        _uri(path),
+        headers: _headers(authenticated),
+        body: jsonEncode(body),
+      ),
     );
     return _decodeObject(response);
   }
@@ -87,34 +98,63 @@ class ApiClient {
     String? altText,
     bool authenticated = false,
   }) async {
-    final request = http.MultipartRequest('POST', _uri(path));
-    request.headers['Accept'] = 'application/json';
-    if (authenticated && accessToken != null) {
-      request.headers['Authorization'] = 'Bearer $accessToken';
-    }
-    if (altText != null && altText.trim().isNotEmpty) {
-      request.fields['altText'] = altText.trim();
-    }
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: fileName,
-        contentType: _imageMediaType(fileName),
-      ),
-    );
     return _decodeObject(
-      await http.Response.fromStream(await _client.send(request)),
+      await _send(authenticated, () async {
+        final request = http.MultipartRequest('POST', _uri(path));
+        request.headers['Accept'] = 'application/json';
+        if (authenticated && accessToken != null) {
+          request.headers['Authorization'] = 'Bearer $accessToken';
+        }
+        if (altText != null && altText.trim().isNotEmpty) {
+          request.fields['altText'] = altText.trim();
+        }
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: fileName,
+            contentType: _imageMediaType(fileName),
+          ),
+        );
+        return http.Response.fromStream(await _client.send(request));
+      }),
     );
   }
 
   Future<void> delete(String path, {bool authenticated = false}) async {
-    final response = await _client.delete(
-      _uri(path),
-      headers: _headers(authenticated),
+    final response = await _send(
+      authenticated,
+      () => _client.delete(_uri(path), headers: _headers(authenticated)),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _decodeObject(response);
+    }
+  }
+
+  Future<http.Response> _send(
+    bool authenticated,
+    Future<http.Response> Function() request,
+  ) async {
+    var response = await request();
+    if (authenticated &&
+        response.statusCode == 401 &&
+        await _refreshAccessToken()) {
+      response = await request();
+    }
+    return response;
+  }
+
+  Future<bool> _refreshAccessToken() async {
+    final refresh = refreshAccessToken;
+    if (refresh == null) return false;
+    final existing = _refreshInProgress;
+    if (existing != null) return existing;
+    final operation = refresh();
+    _refreshInProgress = operation;
+    try {
+      return await operation;
+    } finally {
+      _refreshInProgress = null;
     }
   }
 

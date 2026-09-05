@@ -8,7 +8,9 @@ import '../domain/app_user.dart';
 enum AuthStatus { initial, loading, authenticated, unauthenticated }
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._repository);
+  AuthController(this._repository) {
+    _repository.onSessionChanged = _synchronizeSession;
+  }
 
   final AuthRepository _repository;
   AuthStatus status = AuthStatus.initial;
@@ -16,6 +18,14 @@ class AuthController extends ChangeNotifier {
   String? errorMessage;
 
   AppUser? get user => _session?.user;
+
+  void _synchronizeSession(AuthSession? session) {
+    _session = session;
+    if (session == null && status == AuthStatus.authenticated) {
+      status = AuthStatus.unauthenticated;
+      notifyListeners();
+    }
+  }
 
   Future<void> restoreSession() async {
     status = AuthStatus.loading;
@@ -34,7 +44,7 @@ class AuthController extends ChangeNotifier {
     try {
       final session = await _repository.login(userName.trim(), password);
       if (!session.user.isAdmin && !session.user.isOwner) {
-        await _repository.logout(session.refreshToken);
+        await _repository.logout();
         errorMessage =
             'Desktop aplikaciji mogu pristupiti Admin i Owner korisnici.';
         status = AuthStatus.unauthenticated;
@@ -57,12 +67,17 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    final session = _session;
     status = AuthStatus.loading;
     notifyListeners();
-    if (session != null) await _repository.logout(session.refreshToken);
+    await _repository.logout();
     _session = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _repository.onSessionChanged = null;
+    super.dispose();
   }
 }
