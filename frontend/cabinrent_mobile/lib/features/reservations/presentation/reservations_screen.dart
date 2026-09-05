@@ -4,6 +4,7 @@ import '../domain/reservation.dart';
 import 'reservations_controller.dart';
 import 'reservation_details_screen.dart';
 import 'cancellation_reason_dialog.dart';
+import 'reservation_grouping.dart';
 import '../../reviews/presentation/review_form_screen.dart';
 import '../../reviews/presentation/reviews_controller.dart';
 
@@ -14,6 +15,17 @@ class ReservationsScreen extends StatefulWidget {
 }
 
 class _ReservationsScreenState extends State<ReservationsScreen> {
+  String? _selectedStatus;
+
+  static const _statusFilters = <({String? status, String label})>[
+    (status: null, label: 'Sve'),
+    (status: 'Pending', label: 'Na čekanju'),
+    (status: 'Confirmed', label: 'Potvrđene'),
+    (status: 'Completed', label: 'Završene'),
+    (status: 'Cancelled', label: 'Otkazane'),
+    (status: 'Rejected', label: 'Odbijene'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +41,10 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   Widget build(BuildContext context) {
     final c = context.watch<ReservationsController>();
     final reviews = context.read<ReviewsController>();
+    final groups = groupReservationsByCheckIn(
+      c.reservations,
+      status: _selectedStatus,
+    );
     return RefreshIndicator(
       onRefresh: () async {
         await Future.wait([c.load(), reviews.loadMine()]);
@@ -62,20 +78,103 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             const SliverFillRemaining(
               child: _Empty(message: 'Još nemate rezervacija.'),
             )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              sliver: SliverList.separated(
-                itemCount: c.reservations.length,
-                itemBuilder: (_, i) =>
-                    _ReservationCard(reservation: c.reservations[i]),
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
+          else ...[
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _statusFilters.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final filter = _statusFilters[index];
+                    return ChoiceChip(
+                      label: Text(filter.label),
+                      selected: _selectedStatus == filter.status,
+                      onSelected: (_) =>
+                          setState(() => _selectedStatus = filter.status),
+                    );
+                  },
+                ),
               ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            if (groups.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _FilteredEmpty(),
+              )
+            else
+              ...groups.map(
+                (group) => SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                  sliver: SliverList.separated(
+                    itemCount: group.reservations.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _DayHeader(
+                          date: group.date,
+                          reservationCount: group.reservations.length,
+                        );
+                      }
+                      return _ReservationCard(
+                        reservation: group.reservations[index - 1],
+                      );
+                    },
+                    separatorBuilder: (_, index) =>
+                        SizedBox(height: index == 0 ? 8 : 12),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
   }
+}
+
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.date, required this.reservationCount});
+
+  final DateTime date;
+  final int reservationCount;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(
+        Icons.calendar_today_outlined,
+        size: 18,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          'Dolazak — ${reservationDayLabel(date)}',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+      Text('$reservationCount', style: Theme.of(context).textTheme.bodySmall),
+    ],
+  );
+}
+
+class _FilteredEmpty extends StatelessWidget {
+  const _FilteredEmpty();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(32),
+      child: Text(
+        'Nema rezervacija sa odabranim statusom.',
+        textAlign: TextAlign.center,
+      ),
+    ),
+  );
 }
 
 class _ReservationCard extends StatelessWidget {
