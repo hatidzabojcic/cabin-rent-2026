@@ -9,6 +9,8 @@ class AuthRepository {
   }
   final ApiClient _api;
   final SessionStorage _storage;
+  AuthSession? _session;
+  void Function(AuthSession? session)? onSessionChanged;
 
   Future<AuthSession> login(String userName, String password) async => _save(
     AuthSession.fromJson(
@@ -58,28 +60,29 @@ class AuthRepository {
         ),
       );
     } catch (_) {
-      await _storage.clear();
+      await _clearSession();
       return null;
     }
   }
 
-  Future<void> logout(String token) async {
+  Future<void> logout() async {
+    final token = _session?.refreshToken ?? await _storage.readRefreshToken();
     try {
-      await _api.post(
-        '/api/auth/logout',
-        body: {'refreshToken': token},
-        authenticated: true,
-      );
+      if (token != null) {
+        await _api.post(
+          '/api/auth/logout',
+          body: {'refreshToken': token},
+          authenticated: true,
+        );
+      }
     } finally {
-      _api.accessToken = null;
-      await _storage.clear();
+      await _clearSession();
     }
   }
 
   Future<void> deactivateProfile() async {
     await _api.delete('/api/auth/me', authenticated: true);
-    _api.accessToken = null;
-    await _storage.clear();
+    await _clearSession();
   }
 
   Future<void> changePassword({
@@ -91,8 +94,7 @@ class AuthRepository {
       authenticated: true,
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
     );
-    _api.accessToken = null;
-    await _storage.clear();
+    await _clearSession();
   }
 
   Future<AppUser> updateProfile({
@@ -132,6 +134,15 @@ class AuthRepository {
   Future<AuthSession> _save(AuthSession session) async {
     _api.accessToken = session.accessToken;
     await _storage.saveRefreshToken(session.refreshToken);
+    _session = session;
+    onSessionChanged?.call(session);
     return session;
+  }
+
+  Future<void> _clearSession() async {
+    _api.accessToken = null;
+    await _storage.clear();
+    _session = null;
+    onSessionChanged?.call(null);
   }
 }

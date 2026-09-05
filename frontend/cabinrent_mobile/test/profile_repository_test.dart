@@ -11,6 +11,72 @@ import 'package:http/testing.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'logout revokes the latest refresh token after token rotation',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'cabinrent_refresh_token': 'refresh-token-1',
+      });
+      var refreshCount = 0;
+      var protectedRequestCount = 0;
+      String? logoutRefreshToken;
+      final client = MockClient((request) async {
+        if (request.url.path == '/api/auth/refresh') {
+          refreshCount++;
+          final nextToken = 'refresh-token-${refreshCount + 1}';
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-token-$refreshCount',
+              'refreshToken': nextToken,
+              'expiresAtUtc': '2026-09-05T12:00:00Z',
+              'user': {
+                'id': 4,
+                'firstName': 'Demo',
+                'lastName': 'Guest',
+                'email': 'guest@cabinrent.local',
+                'userName': 'guest',
+                'phoneNumber': null,
+                'isActive': true,
+                'roles': ['Guest'],
+              },
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/api/protected') {
+          protectedRequestCount++;
+          return protectedRequestCount == 1
+              ? http.Response('', 401)
+              : http.Response(jsonEncode({'ok': true}), 200);
+        }
+        if (request.url.path == '/api/auth/logout') {
+          logoutRefreshToken =
+              (jsonDecode(request.body) as Map<String, dynamic>)['refreshToken']
+                  as String;
+          return http.Response('', 204);
+        }
+        return http.Response('', 404);
+      });
+      final api = ApiClient(client: client);
+      const storage = SessionStorage();
+      final repository = AuthRepository(api, storage);
+      final synchronizedSessions = <String>[];
+      repository.onSessionChanged = (session) {
+        if (session != null) synchronizedSessions.add(session.refreshToken);
+      };
+
+      await repository.restore();
+      await api.getObject('/api/protected', authenticated: true);
+      await repository.logout();
+
+      expect(refreshCount, 2);
+      expect(synchronizedSessions, ['refresh-token-2', 'refresh-token-3']);
+      expect(logoutRefreshToken, 'refresh-token-3');
+      expect(await storage.readRefreshToken(), isNull);
+      expect(api.accessToken, isNull);
+    },
+  );
+
   test('deactivates profile and clears the saved session', () async {
     FlutterSecureStorage.setMockInitialValues({
       'cabinrent_refresh_token': 'refresh-token',

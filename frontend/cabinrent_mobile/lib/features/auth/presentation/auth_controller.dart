@@ -7,13 +7,23 @@ import '../domain/auth_session.dart';
 enum AuthStatus { initial, loading, authenticated, unauthenticated }
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._repository);
+  AuthController(this._repository) {
+    _repository.onSessionChanged = _synchronizeSession;
+  }
   final AuthRepository _repository;
   AuthStatus status = AuthStatus.initial;
   AuthSession? _session;
   String? errorMessage;
   AppUser? get user => _session?.user;
   bool get isLoading => status == AuthStatus.loading;
+
+  void _synchronizeSession(AuthSession? session) {
+    _session = session;
+    if (session == null && status == AuthStatus.authenticated) {
+      status = AuthStatus.unauthenticated;
+      notifyListeners();
+    }
+  }
 
   void clearError() {
     if (errorMessage == null) return;
@@ -26,7 +36,7 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
     _session = await _repository.restore();
     if (_session != null && !_session!.user.isGuest) {
-      await _repository.logout(_session!.refreshToken);
+      await _repository.logout();
       _session = null;
     }
     status = _session == null
@@ -63,7 +73,7 @@ class AuthController extends ChangeNotifier {
     try {
       final session = await action();
       if (!session.user.isGuest) {
-        await _repository.logout(session.refreshToken);
+        await _repository.logout();
         errorMessage = 'Mobilna aplikacija je namijenjena gostima.';
         status = AuthStatus.unauthenticated;
         notifyListeners();
@@ -85,10 +95,9 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    final session = _session;
     status = AuthStatus.loading;
     notifyListeners();
-    if (session != null) await _repository.logout(session.refreshToken);
+    await _repository.logout();
     _session = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
@@ -212,5 +221,11 @@ class AuthController extends ChangeNotifier {
     status = AuthStatus.authenticated;
     notifyListeners();
     return false;
+  }
+
+  @override
+  void dispose() {
+    _repository.onSessionChanged = null;
+    super.dispose();
   }
 }
