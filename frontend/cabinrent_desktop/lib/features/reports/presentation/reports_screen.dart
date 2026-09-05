@@ -301,9 +301,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               _MetricCard(
                 icon: Icons.bedtime_outlined,
-                label: 'Noćenja',
+                label: 'Realizovana noćenja',
                 value: report.totalNights.toString(),
-                hint: '${report.totalGuests} gostiju',
+                hint: '${report.totalGuests} realizovanih gostiju',
               ),
               _MetricCard(
                 icon: Icons.payments_outlined,
@@ -417,7 +417,7 @@ class _MonthlyChart extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Noćenja po mjesecima',
+              'Realizovana noćenja po mjesecima',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 18),
@@ -503,8 +503,8 @@ class _CabinRanking extends StatelessWidget {
             DataColumn(label: Text('Vlasnik')),
             DataColumn(label: Text('Rezervacije')),
             DataColumn(label: Text('Završene')),
-            DataColumn(label: Text('Noćenja')),
-            DataColumn(label: Text('Gosti')),
+            DataColumn(label: Text('Realizovana noćenja')),
+            DataColumn(label: Text('Realizovani gosti')),
             DataColumn(label: Text('Prihod')),
           ],
           rows: cabins.asMap().entries.map((entry) {

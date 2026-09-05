@@ -36,8 +36,8 @@ class ReportPdfService {
             children: [
               _metric('Rezervacije', report.totalReservations.toString()),
               _metric('Zavrseni boravci', report.completedStays.toString()),
-              _metric('Nocenja', report.totalNights.toString()),
-              _metric('Gosti', report.totalGuests.toString()),
+              _metric('Realizovana nocenja', report.totalNights.toString()),
+              _metric('Realizovani gosti', report.totalGuests.toString()),
               _metric('Prihod', _money(report.revenue)),
             ],
           ),
@@ -48,7 +48,7 @@ class ReportPdfService {
               'Mjesec',
               'Rezervacije',
               'Zavrseni boravci',
-              'Nocenja',
+              'Realizovana nocenja',
               'Prihod',
             ],
             data: report.months
@@ -88,8 +88,8 @@ class ReportPdfService {
                 'Vlasnik',
                 'Rez.',
                 'Zavrsene',
-                'Nocenja',
-                'Gosti',
+                'Realizovana nocenja',
+                'Realizovani gosti',
                 'Prihod',
               ],
               data: report.cabins.asMap().entries.map((entry) {

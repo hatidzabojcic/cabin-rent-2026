@@ -24,6 +24,26 @@ public sealed class ReportRulesTests
     public void Nights_are_calculated_from_date_range() =>
         Assert.Equal(4, ReportRules.Nights(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 14)));
 
+    public static TheoryData<PaymentStatus, decimal, decimal?, decimal, decimal> NetRevenueCases => new()
+    {
+        { PaymentStatus.Paid, 800m, 750m, 0m, 750m },
+        { PaymentStatus.Paid, 800m, 750m, 100m, 650m },
+        { PaymentStatus.Refunded, 800m, null, 800m, 0m },
+        { PaymentStatus.Pending, 800m, null, 0m, 0m },
+        { PaymentStatus.Failed, 800m, null, 0m, 0m },
+        { PaymentStatus.Paid, 800m, 750m, 900m, 0m }
+    };
+
+    [Theory]
+    [MemberData(nameof(NetRevenueCases))]
+    public void Net_revenue_uses_collected_amount_and_subtracts_refunds(
+        PaymentStatus status,
+        decimal amount,
+        decimal? chargedAmount,
+        decimal refundedAmount,
+        decimal expected) =>
+        Assert.Equal(expected, ReportRules.NetRevenue(status, amount, chargedAmount, refundedAmount));
+
     [Fact]
     public void Guests_are_ranked_by_completed_stays_then_nights()
     {

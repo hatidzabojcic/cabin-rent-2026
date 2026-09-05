@@ -13,6 +13,18 @@ public static class ReportRules
     public static int Nights(DateOnly checkIn, DateOnly checkOut) =>
         Math.Max(0, checkOut.DayNumber - checkIn.DayNumber);
 
+    public static decimal NetRevenue(
+        PaymentStatus? paymentStatus,
+        decimal paymentAmount,
+        decimal? chargedAmount,
+        decimal refundedAmount)
+    {
+        if (paymentStatus is not (PaymentStatus.Paid or PaymentStatus.Refunded)) return 0;
+
+        var collectedAmount = chargedAmount ?? paymentAmount;
+        return Math.Max(0, collectedAmount - refundedAmount);
+    }
+
     public static IReadOnlyCollection<TopGuestDto> RankGuests(IEnumerable<TopGuestDto> guests, int limit) =>
         guests.OrderByDescending(x => x.CompletedStays)
             .ThenByDescending(x => x.Nights)
