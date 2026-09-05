@@ -226,6 +226,15 @@ public sealed class RefreshToken : Entity
     public User User { get; set; } = null!;
 }
 
+public sealed class PasswordResetToken : Entity
+{
+    public required string TokenHash { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+    public DateTime? UsedAtUtc { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+}
+
 public sealed class Notification : Entity
 {
     public Guid EventId { get; set; }

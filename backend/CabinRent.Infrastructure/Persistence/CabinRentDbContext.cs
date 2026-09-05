@@ -20,6 +20,7 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<AvailabilityBlock> AvailabilityBlocks => Set<AvailabilityBlock>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
 
@@ -44,6 +45,8 @@ public sealed class CabinRentDbContext(DbContextOptions<CabinRentDbContext> opti
         modelBuilder.Entity<NotificationOutbox>().HasIndex(x => new { x.PublishedAtUtc, x.NextAttemptAtUtc, x.CreatedAtUtc });
         modelBuilder.Entity<Review>().HasIndex(x => x.ReservationId).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(x => x.TokenHash).IsUnique();
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
         modelBuilder.Entity<RefreshToken>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
         modelBuilder.Entity<Notification>().HasIndex(x => x.EventId).IsUnique();
         modelBuilder.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAtUtc });

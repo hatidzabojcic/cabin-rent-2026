@@ -14,7 +14,11 @@ using CabinRent.Infrastructure.Platform;
 
 namespace CabinRent.Infrastructure.Auth;
 
-public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOptions> options, IImageStorage imageStorage) : IAuthService
+public sealed class AuthService(
+    CabinRentDbContext dbContext,
+    IOptions<JwtOptions> options,
+    IImageStorage imageStorage,
+    IPasswordResetDelivery passwordResetDelivery) : IAuthService
 {
     private readonly JwtOptions jwt = options.Value;
 
@@ -204,6 +208,51 @@ public sealed class AuthService(CabinRentDbContext dbContext, IOptions<JwtOption
             token.RevokedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users.SingleOrDefaultAsync(
+            x => x.Email == normalized && x.IsActive, cancellationToken);
+        if (user is null) return;
+
+        var now = DateTime.UtcNow;
+        var activeTokens = await dbContext.PasswordResetTokens
+            .Where(x => x.UserId == user.Id && x.UsedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var activeToken in activeTokens) activeToken.UsedAtUtc = now;
+
+        var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var expires = now.AddMinutes(15);
+        dbContext.PasswordResetTokens.Add(new PasswordResetToken
+        {
+            UserId = user.Id,
+            TokenHash = HashToken(rawToken),
+            ExpiresAtUtc = expires
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await passwordResetDelivery.SendAsync(user.Email, rawToken, expires, cancellationToken);
+    }
+
+    public async Task ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var stored = await dbContext.PasswordResetTokens
+            .Include(x => x.User).ThenInclude(x => x.RefreshTokens)
+            .SingleOrDefaultAsync(x => x.TokenHash == HashToken(token.Trim()), cancellationToken);
+        if (stored is null || stored.UsedAtUtc.HasValue || stored.ExpiresAtUtc <= now || !stored.User.IsActive)
+            throw new BusinessRuleException("Token za reset lozinke nije validan ili je istekao.");
+        if (PasswordHash.Verify(newPassword, stored.User.PasswordHash))
+            throw new BusinessRuleException("Nova lozinka mora biti različita od trenutne.");
+
+        stored.UsedAtUtc = now;
+        stored.User.PasswordHash = PasswordHash.Create(newPassword);
+        stored.User.TokenVersion++;
+        stored.User.UpdatedAtUtc = now;
+        foreach (var refreshToken in stored.User.RefreshTokens.Where(x => x.RevokedAtUtc == null))
+            refreshToken.RevokedAtUtc = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<AuthResponse> CreateSessionAsync(User user, string? ipAddress, CancellationToken cancellationToken)

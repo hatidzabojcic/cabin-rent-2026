@@ -48,6 +48,20 @@ class AuthRepository {
     return _refreshSession();
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _api.post('/api/auth/forgot-password', body: {'email': email.trim()});
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _api.post(
+      '/api/auth/reset-password',
+      body: {'token': token.trim(), 'newPassword': newPassword},
+    );
+  }
+
   Future<bool> _refreshAccessToken() async => await _refreshSession() != null;
 
   Future<AuthSession?> _refreshSession() async {

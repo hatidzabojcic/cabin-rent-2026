@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import 'auth_controller.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -119,6 +120,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           : const Text('Prijavi se'),
                     ),
                     const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: auth.isLoading
+                          ? null
+                          : () {
+                              auth.clearError();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
+                      child: const Text('Zaboravili ste lozinku?'),
+                    ),
                     TextButton(
                       onPressed: auth.isLoading
                           ? null

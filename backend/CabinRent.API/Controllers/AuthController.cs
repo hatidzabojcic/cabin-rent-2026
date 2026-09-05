@@ -90,5 +90,23 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken) =>
         await authService.ChangePasswordAsync(User.GetUserId(), request, cancellationToken) ? NoContent() : NotFound();
 
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await authService.RequestPasswordResetAsync(request.Email, cancellationToken);
+        return Accepted(new { message = "Ako aktivan račun postoji, upute za reset lozinke su poslane na uneseni email." });
+    }
+
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await authService.ResetPasswordAsync(request.Token, request.NewPassword, cancellationToken);
+        return NoContent();
+    }
+
     private string? ClientIp() => HttpContext.Connection.RemoteIpAddress?.ToString();
 }

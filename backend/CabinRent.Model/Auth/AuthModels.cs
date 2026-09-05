@@ -34,5 +34,16 @@ public sealed class ChangePasswordRequest
     [Required, MinLength(8), MaxLength(200)] public required string NewPassword { get; init; }
 }
 
+public sealed class ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(320)] public required string Email { get; init; }
+}
+
+public sealed class ResetPasswordRequest
+{
+    [Required, MaxLength(200)] public required string Token { get; init; }
+    [Required, MinLength(8), MaxLength(200)] public required string NewPassword { get; init; }
+}
+
 public sealed record AuthResponse(
     string AccessToken, string RefreshToken, DateTime ExpiresAtUtc, UserDto User);

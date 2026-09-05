@@ -1,4 +1,11 @@
 services:
+  cabinrent-mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "${MAILPIT_WEB_PORT}:8025"
+    restart: unless-stopped
+    networks: [cabinrent-network]
+
   cabinrent-sql:
     image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
     environment:
@@ -64,9 +71,14 @@ services:
       Stripe__SecretKey: ${STRIPE_SECRET_KEY}
       Stripe__PublishableKey: ${STRIPE_PUBLISHABLE_KEY}
       Stripe__WebhookSecret: ${STRIPE_WEBHOOK_SECRET}
+      PasswordReset__SmtpHost: cabinrent-mailpit
+      PasswordReset__SmtpPort: 1025
+      PasswordReset__FromAddress: noreply@cabinrent.local
     ports:
       - "${API_PORT}:8080"
     depends_on:
+      cabinrent-mailpit:
+        condition: service_started
       cabinrent-sql:
         condition: service_healthy
       cabinrent-rabbitmq:

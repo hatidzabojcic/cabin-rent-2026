@@ -25,13 +25,13 @@ import 'features/announcements/data/announcements_repository.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final api = ApiClient();
+  final authRepository = AuthRepository(api, const SessionStorage());
   runApp(
     MultiProvider(
       providers: [
+        Provider.value(value: authRepository),
         ChangeNotifierProvider(
-          create: (_) =>
-              AuthController(AuthRepository(api, const SessionStorage()))
-                ..restoreSession(),
+          create: (_) => AuthController(authRepository)..restoreSession(),
         ),
         ChangeNotifierProvider(
           create: (_) => CabinsController(CabinsRepository(api)),

@@ -41,6 +41,17 @@ public static class DependencyInjection
             throw new InvalidOperationException("JWT configuration is missing or invalid.");
         services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwtOptions));
         services.AddScoped<IAuthService, AuthService>();
+        var passwordResetSection = configuration.GetSection(PasswordResetOptions.SectionName);
+        services.AddSingleton<IOptions<PasswordResetOptions>>(Options.Create(new PasswordResetOptions
+        {
+            SmtpHost = passwordResetSection["SmtpHost"] ?? "localhost",
+            SmtpPort = int.TryParse(passwordResetSection["SmtpPort"], out var smtpPort) ? smtpPort : 1025,
+            FromAddress = passwordResetSection["FromAddress"] ?? "noreply@cabinrent.local",
+            UserName = passwordResetSection["UserName"],
+            Password = passwordResetSection["Password"],
+            EnableSsl = bool.TryParse(passwordResetSection["EnableSsl"], out var enableSsl) && enableSsl
+        }));
+        services.AddScoped<IPasswordResetDelivery, SmtpPasswordResetDelivery>();
         services.AddScoped<ICabinService, CabinService>();
         services.AddScoped<IAvailabilityBlockService, AvailabilityBlockService>();
         var imageRoot = configuration["ImageStorage:RootPath"] ?? Path.Combine(AppContext.BaseDirectory, "uploads");
