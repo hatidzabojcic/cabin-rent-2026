@@ -17,6 +17,8 @@ class CabinDetails {
     required this.cabinType,
     required this.images,
     required this.amenities,
+    this.latitude,
+    this.longitude,
   });
 
   factory CabinDetails.fromJson(Map<String, dynamic> json) => CabinDetails(
@@ -33,6 +35,8 @@ class CabinDetails {
     ownerName: json['ownerName'] as String,
     city: json['city'] as String,
     cabinType: json['cabinType'] as String,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
     images: (json['images'] as List<dynamic>)
         .map((value) => CabinImage.fromJson(value as Map<String, dynamic>))
         .toList(),
@@ -54,6 +58,8 @@ class CabinDetails {
   final String ownerName;
   final String city;
   final String cabinType;
+  final double? latitude;
+  final double? longitude;
   final List<CabinImage> images;
   final List<CabinAmenity> amenities;
 

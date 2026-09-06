@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/cabin_details.dart';
 import '../domain/cabin_search_criteria.dart';
@@ -84,6 +85,23 @@ class _DetailsContent extends StatelessWidget {
   final VoidCallback? onReservationCreated;
   final Future<List<Review>> reviews;
 
+  Future<void> _openLocation(BuildContext context) async {
+    final latitude = details.latitude;
+    final longitude = details.longitude;
+    if (latitude == null || longitude == null) return;
+
+    final uri = Uri.parse(
+      'https://www.openstreetmap.org/?mlat=$latitude&mlon=$longitude'
+      '#map=16/$latitude/$longitude',
+    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lokaciju nije moguće otvoriti.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.only(bottom: 32),
@@ -117,6 +135,27 @@ class _DetailsContent extends StatelessWidget {
                 Expanded(child: Text('${details.address}, ${details.city}')),
               ],
             ),
+            if (details.latitude != null && details.longitude != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${details.latitude!.toStringAsFixed(6)}, '
+                      '${details.longitude!.toStringAsFixed(6)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _openLocation(context),
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Prikaži na karti'),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 18),
             _Price(price: details.pricePerNight),
             if (searchCriteria != null) ...[

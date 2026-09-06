@@ -1,10 +1,28 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../catalog/data/reference_data_repository.dart';
+import '../../catalog/domain/reference_data.dart';
 import '../data/cabins_repository.dart';
 import '../domain/cabin.dart';
+import 'location_picker_dialog.dart';
+
+class _ReverseGeocodeResult {
+  const _ReverseGeocodeResult({
+    required this.address,
+    required this.localityCandidates,
+  });
+
+  final String address;
+  final List<String> localityCandidates;
+
+  String get detectedLocality => localityCandidates.firstOrNull ?? 'nepoznata';
+}
 
 class CabinFormDialog extends StatefulWidget {
   const CabinFormDialog({super.key, this.cabin});
@@ -24,8 +42,13 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
   int? _cityId;
   int? _typeId;
   int? _ownerId;
+  double? _latitude;
+  double? _longitude;
   bool _loading = true;
   bool _saving = false;
+  bool _resolvingAddress = false;
+  String? _locationMessage;
+  String? _detectedCityName;
   String? _error;
 
   @override
@@ -48,12 +71,12 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
       'bathrooms': TextEditingController(
         text: (cabin?.bathrooms ?? 1).toString(),
       ),
-      'latitude': TextEditingController(text: cabin?.latitude?.toString()),
-      'longitude': TextEditingController(text: cabin?.longitude?.toString()),
     };
     _cityId = cabin?.cityId;
     _typeId = cabin?.cabinTypeId;
     _ownerId = cabin?.ownerId;
+    _latitude = cabin?.latitude;
+    _longitude = cabin?.longitude;
     _amenityIds = {...?cabin?.amenityIds};
     _loadCatalogs();
   }
@@ -74,7 +97,6 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
         _types = results[1] as List<CatalogOption>;
         _amenities = results[2] as List<CatalogOption>;
         if (isAdmin) _owners = results[3] as List<OwnerOption>;
-        _cityId ??= _cities.firstOrNull?.id;
         _typeId ??= _types.firstOrNull?.id;
         _ownerId ??= _owners.firstOrNull?.id;
         _loading = false;
@@ -113,9 +135,14 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate() ||
-        _cityId == null ||
-        _typeId == null) {
+    if (!_formKey.currentState!.validate() || _typeId == null) {
+      return;
+    }
+    if (_cityId == null) {
+      setState(
+        () => _error =
+            'Odaberite grad. Ako prepoznati grad nije ponuđen, prvo ga dodajte kroz Šifrarnici > Gradovi.',
+      );
       return;
     }
     final isAdmin = context.read<AuthController>().user!.isAdmin;
@@ -143,10 +170,8 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
       cabinTypeId: _typeId!,
       ownerId: isAdmin ? _ownerId : null,
       amenityIds: _amenityIds,
-      latitude: double.tryParse(_fields['latitude']!.text.replaceAll(',', '.')),
-      longitude: double.tryParse(
-        _fields['longitude']!.text.replaceAll(',', '.'),
-      ),
+      latitude: _latitude,
+      longitude: _longitude,
       coverImageUrl: null,
     );
     try {
@@ -168,6 +193,170 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _pickLocation() async {
+    final selected = await showDialog<LocationSelection>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => LocationPickerDialog(
+        initialLatitude: _latitude,
+        initialLongitude: _longitude,
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _latitude = selected.latitude;
+      _longitude = selected.longitude;
+      _resolvingAddress = true;
+      _locationMessage = null;
+      _detectedCityName = null;
+    });
+
+    try {
+      final result = await _reverseGeocode(selected);
+      if (!mounted) return;
+      if (result != null) {
+        _fields['address']!.text = result.address;
+        final matchedCity = _matchCity(result.localityCandidates);
+        setState(() {
+          _cityId = matchedCity?.id;
+          _detectedCityName = matchedCity == null
+              ? result.detectedLocality
+              : null;
+          _locationMessage = matchedCity == null
+              ? 'Prepoznata lokacija: ${result.detectedLocality}. Grad nije u šifrarniku; dodajte ga kroz Šifrarnici > Gradovi.'
+              : 'Grad je automatski prepoznat: ${matchedCity.name}.';
+        });
+      } else {
+        setState(() {
+          _cityId = null;
+          _detectedCityName = null;
+          _locationMessage =
+              'Grad nije automatski prepoznat. Odaberite odgovarajući grad ili ga prvo dodajte u šifrarnik.';
+        });
+        _showAddressLookupWarning();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _cityId = null;
+          _detectedCityName = null;
+          _locationMessage =
+              'Lokacijski servis nije dostupan. Provjerite adresu i svjesno odaberite grad.';
+        });
+        _showAddressLookupWarning();
+      }
+    } finally {
+      if (mounted) setState(() => _resolvingAddress = false);
+    }
+  }
+
+  Future<_ReverseGeocodeResult?> _reverseGeocode(
+    LocationSelection selected,
+  ) async {
+    final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+      'format': 'jsonv2',
+      'lat': selected.latitude.toString(),
+      'lon': selected.longitude.toString(),
+      'zoom': '18',
+      'addressdetails': '1',
+      'accept-language': 'bs',
+    });
+    final response = await http
+        .get(
+          uri,
+          headers: const {
+            'Accept': 'application/json',
+            'User-Agent': 'CabinRent seminar application',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) return null;
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final displayName = (json['display_name'] as String?)?.trim();
+    if (displayName?.isNotEmpty != true) return null;
+
+    final address = json['address'] as Map<String, dynamic>? ?? const {};
+    final candidates = <String>{
+      for (final key in const [
+        'city',
+        'town',
+        'village',
+        'municipality',
+        'county',
+      ])
+        if ((address[key] as String?)?.trim().isNotEmpty == true)
+          (address[key] as String).trim(),
+    }.toList();
+    return _ReverseGeocodeResult(
+      address: displayName!,
+      localityCandidates: candidates,
+    );
+  }
+
+  CatalogOption? _matchCity(List<String> candidates) {
+    for (final candidate in candidates) {
+      final normalizedCandidate = _normalizeLocationName(candidate);
+      for (final city in _cities) {
+        if (_normalizeLocationName(city.name) == normalizedCandidate) {
+          return city;
+        }
+      }
+    }
+    return null;
+  }
+
+  String _normalizeLocationName(String value) => value
+      .toLowerCase()
+      .replaceAll('č', 'c')
+      .replaceAll('ć', 'c')
+      .replaceAll('đ', 'd')
+      .replaceAll('š', 's')
+      .replaceAll('ž', 'z')
+      .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  void _showAddressLookupWarning() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Koordinate su sačuvane, ali adresu nije moguće automatski pronaći. Unesite je ručno.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addDetectedCity() async {
+    final cityName = _detectedCityName;
+    if (cityName == null) return;
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _QuickAddCityDialog(suggestedName: cityName),
+    );
+    if (created != true || !mounted) return;
+
+    try {
+      final cities = await context.read<CabinsRepository>().getCities();
+      if (!mounted) return;
+      setState(() {
+        _cities = cities;
+        final normalizedName = _normalizeLocationName(cityName);
+        final match = cities
+            .where(
+              (city) => _normalizeLocationName(city.name) == normalizedName,
+            )
+            .firstOrNull;
+        _cityId = match?.id;
+        _detectedCityName = null;
+        _locationMessage = match == null
+            ? 'Grad je dodan, ali ga nije moguće automatski odabrati. Ponovo otvorite formu.'
+            : 'Grad je dodan u šifrarnik i automatski odabran: ${match.name}.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
     }
   }
 
@@ -196,7 +385,9 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    onPressed: _saving || _resolvingAddress
+                        ? null
+                        : () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -253,7 +444,12 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                                     'Grad',
                                     _cityId,
                                     _cities,
-                                    (value) => setState(() => _cityId = value),
+                                    (value) => setState(() {
+                                      _cityId = value;
+                                      if (value != null) {
+                                        _locationMessage = null;
+                                      }
+                                    }),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -367,23 +563,55 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                             ),
                             const SizedBox(height: 22),
                             const _SectionTitle('Lokacija'),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _textField(
-                                    'latitude',
-                                    'Latitude (opcionalno)',
+                            _LocationField(
+                              latitude: _latitude,
+                              longitude: _longitude,
+                              onPick: _pickLocation,
+                              onClear: _latitude == null
+                                  ? null
+                                  : () => setState(() {
+                                      _latitude = null;
+                                      _longitude = null;
+                                    }),
+                            ),
+                            if (_resolvingAddress) ...[
+                              const SizedBox(height: 10),
+                              const Row(
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
+                                  SizedBox(width: 8),
+                                  Text('Automatsko pronalaženje adrese...'),
+                                ],
+                              ),
+                            ],
+                            if (_locationMessage != null) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                _locationMessage!,
+                                style: TextStyle(
+                                  color: _cityId == null
+                                      ? Theme.of(context).colorScheme.error
+                                      : Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: _textField(
-                                    'longitude',
-                                    'Longitude (opcionalno)',
+                              ),
+                              if (isAdmin && _detectedCityName != null) ...[
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  onPressed: _addDetectedCity,
+                                  icon: const Icon(Icons.add_location_alt),
+                                  label: Text(
+                                    'Dodaj „$_detectedCityName“ u šifrarnik',
                                   ),
                                 ),
                               ],
-                            ),
+                            ],
                             const SizedBox(height: 12),
                             const Text(
                               'Fotografijama možete upravljati kroz opciju Galerija nakon čuvanja vikendice.',
@@ -410,13 +638,15 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    onPressed: _saving || _resolvingAddress
+                        ? null
+                        : () => Navigator.pop(context),
                     child: const Text('Odustani'),
                   ),
                   const SizedBox(width: 10),
                   FilledButton.icon(
-                    onPressed: _saving ? null : _save,
-                    icon: _saving
+                    onPressed: _saving || _resolvingAddress ? null : _save,
+                    icon: _saving || _resolvingAddress
                         ? const SizedBox.square(
                             dimension: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
@@ -457,6 +687,163 @@ class _CabinFormDialogState extends State<CabinFormDialog> {
   );
 }
 
+class _QuickAddCityDialog extends StatefulWidget {
+  const _QuickAddCityDialog({required this.suggestedName});
+
+  final String suggestedName;
+
+  @override
+  State<_QuickAddCityDialog> createState() => _QuickAddCityDialogState();
+}
+
+class _QuickAddCityDialogState extends State<_QuickAddCityDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  final _postalCode = TextEditingController();
+  List<ReferenceItem> _countries = [];
+  int? _countryId;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.suggestedName);
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    try {
+      final countries = await context
+          .read<ReferenceDataRepository>()
+          .getCountries();
+      if (!mounted) return;
+      setState(() {
+        _countries = countries;
+        _countryId = countries
+            .where((country) => country.isoCode?.toUpperCase() == 'BA')
+            .firstOrNull
+            ?.id;
+        _countryId ??= countries.firstOrNull?.id;
+        _loading = false;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await context
+          .read<ReferenceDataRepository>()
+          .create(ReferenceKind.cities, {
+            'name': _name.text.trim(),
+            'postalCode': _postalCode.text.trim().isEmpty
+                ? null
+                : _postalCode.text.trim(),
+            'countryId': _countryId,
+          });
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _postalCode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Dodaj prepoznati grad'),
+    content: SizedBox(
+      width: 430,
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _name,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Naziv grada'),
+                    validator: (value) => value?.trim().isNotEmpty == true
+                        ? null
+                        : 'Naziv grada je obavezan.',
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<int>(
+                    initialValue: _countryId,
+                    decoration: const InputDecoration(labelText: 'Država'),
+                    items: _countries
+                        .map(
+                          (country) => DropdownMenuItem(
+                            value: country.id,
+                            child: Text(country.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => _countryId = value),
+                    validator: (value) =>
+                        value == null ? 'Odaberite državu.' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _postalCode,
+                    decoration: const InputDecoration(
+                      labelText: 'Poštanski broj (opcionalno)',
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _saving ? null : () => Navigator.pop(context, false),
+        child: const Text('Odustani'),
+      ),
+      FilledButton.icon(
+        onPressed: _loading || _saving ? null : _save,
+        icon: _saving
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.add),
+        label: const Text('Dodaj grad'),
+      ),
+    ],
+  );
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   final String text;
@@ -472,4 +859,72 @@ class _SectionTitle extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _LocationField extends StatelessWidget {
+  const _LocationField({
+    required this.latitude,
+    required this.longitude,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final double? latitude;
+  final double? longitude;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = latitude != null && longitude != null;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            child: Icon(
+              selected
+                  ? Icons.location_on_outlined
+                  : Icons.add_location_alt_outlined,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  selected ? 'Lokacija je odabrana' : 'Lokacija nije odabrana',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  selected
+                      ? '${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}'
+                      : 'Lokacija je opcionalna. Odaberite je klikom na kartu.',
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          if (onClear != null)
+            TextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.location_off_outlined),
+              label: const Text('Ukloni'),
+            ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: onPick,
+            icon: const Icon(Icons.map_outlined),
+            label: Text(selected ? 'Promijeni na karti' : 'Odaberi na karti'),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -208,7 +208,7 @@ class _CabinsScreenState extends State<CabinsScreen> {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 380,
-        mainAxisExtent: 390,
+        mainAxisExtent: 440,
         crossAxisSpacing: 18,
         mainAxisSpacing: 18,
       ),
@@ -384,6 +384,33 @@ class _CabinCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text('${cabin.city}  •  ${cabin.cabinType}'),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 17),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        cabin.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (cabin.latitude != null && cabin.longitude != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3, left: 22),
+                    child: Text(
+                      '${cabin.latitude!.toStringAsFixed(6)}, '
+                      '${cabin.longitude!.toStringAsFixed(6)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
+                  ),
+                const SizedBox(height: 4),
                 Text(
                   '${cabin.maxAdults + cabin.maxChildren} gostiju  •  ${cabin.bedrooms} spavaćih soba',
                 ),
