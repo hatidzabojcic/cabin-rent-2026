@@ -2,7 +2,7 @@
 
 ## Namjena i podaci
 
-Sistem preporuke u mobilnoj aplikaciji gostu prikazuje aktivne, javno dostupne vikendice koje bi mu mogle odgovarati. Identitet korisnika uzima se iz JWT tokena. Koriste se završene rezervacije, favoriti, gradovi i tipovi ranije odabranih objekata, ponašanje drugih aktivnih gostiju, broj završenih boravaka te odobrene recenzije.
+Sistem preporuke u mobilnoj aplikaciji gostu prikazuje aktivne, javno dostupne vikendice koje bi mu mogle odgovarati. Identitet korisnika uzima se iz JWT tokena. Koriste se završene rezervacije, favoriti, gradovi, tipovi i pogodnosti ranije odabranih objekata, ponašanje drugih aktivnih gostiju, broj završenih boravaka te odobrene recenzije.
 
 Iz kandidata se uklanjaju vikendice koje su već osnova korisnikovih preferencija, objekti s njegovom aktivnom rezervacijom i svi objekti koji nisu javno dostupni. Javna dostupnost zahtijeva aktivnu vikendicu i aktivnog izdavača.
 
@@ -14,11 +14,14 @@ score = broj boravaka sličnih gostiju × 8
       + prosječna ocjena × 2
       + min(broj recenzija, 10) × 0,25
       + podudaranje grada ili tipa × 1
+      + min(broj zajedničkih pogodnosti, 5) × 1,5
 ```
 
-Veća težina ponašanja sličnih gostiju daje personalizaciji prednost nad općom popularnošću. Rezultat se zaokružuje na dvije decimale. Sortiranje se zatim radi po rezultatu, prosječnoj ocjeni, broju završenih boravaka i nazivu.
+Veća težina ponašanja sličnih gostiju daje personalizaciji prednost nad općom popularnošću. Bodovanje pogodnosti ograničeno je na pet podudaranja kako veliki broj pogodnosti ne bi potpuno potisnuo ostale signale. Rezultat se zaokružuje na dvije decimale. Sortiranje se zatim radi po rezultatu, prosječnoj ocjeni, broju završenih boravaka i nazivu.
 
-Mobilni klijent prikazuje razlog preporuke: interesovanja sličnih gostiju, visoku ocjenu, popularnost, sličnost prethodno odabranim objektima ili opću popularnost među gostima.
+Poslije bodovanja nema dodatnog filtera aktivnosti. Nova vikendica bez rezervacija ili recenzija ostaje kandidat ako je javno dostupna i može se rangirati prema podudaranju grada, tipa i pogodnosti.
+
+Mobilni klijent prikazuje razlog preporuke: interesovanja sličnih gostiju, visoku ocjenu, popularnost, podudaranje pogodnosti, sličnost prethodno odabranim objektima ili opću popularnost među gostima.
 
 ## Novi korisnik i fallback
 
