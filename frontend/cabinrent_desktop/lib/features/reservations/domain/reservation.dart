@@ -101,6 +101,8 @@ abstract final class ReservationLabels {
     'Paid': 'Plaćeno',
     'Failed': 'Neuspjelo',
     'Refunded': 'Refundirano',
+    'RefundPending': 'Refund u obradi',
+    'RefundFailed': 'Refund nije uspio',
   };
 
   static String status(String value) => statuses[value] ?? value;

@@ -16,7 +16,9 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
     {
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
-        "payment_intent.processing"
+        "payment_intent.processing",
+        "refund.updated",
+        "refund.failed"
     };
 
     public async Task<PaymentIntentDto> CreateIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default)
@@ -149,9 +151,7 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
                 OwnerId = x.Cabin.OwnerId,
                 x.Status,
                 PaymentStatus = x.Payment == null ? (PaymentStatus?)null : x.Payment.Status,
-                ProviderReference = x.Payment == null ? null : x.Payment.ProviderReference,
-                ChargedAmount = x.Payment == null ? null : x.Payment.ChargedAmount,
-                PaymentAmount = x.Payment == null ? 0 : x.Payment.Amount
+                ProviderReference = x.Payment == null ? null : x.Payment.ProviderReference
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (snapshot is null) return false;
@@ -169,22 +169,27 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
             throw new BusinessRuleException("Rezervaciju je moguće otkazati samo prije dana dolaska dok je na čekanju ili potvrđena.");
 
         GatewayRefund? refund = null;
-        if (snapshot.PaymentStatus == PaymentStatus.Paid)
+        GatewayPaymentIntent? providerIntent = null;
+        if (!string.IsNullOrWhiteSpace(snapshot.ProviderReference) &&
+            snapshot.PaymentStatus is not PaymentStatus.Refunded)
         {
-            if (string.IsNullOrWhiteSpace(snapshot.ProviderReference))
-                throw new BusinessRuleException("Plaćanje nema Stripe referencu i ne može biti automatski refundirano.");
-            var chargedAmount = snapshot.ChargedAmount ?? snapshot.PaymentAmount;
-            refund = await paymentGateway.RefundAsync(
-                snapshot.ProviderReference,
-                PaymentRules.ToMinorUnits(chargedAmount),
-                $"reservation-{reservationId}-full-refund",
-                cancellationToken);
-            if (!string.Equals(refund.Status, "succeeded", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(refund.Status, "pending", StringComparison.OrdinalIgnoreCase))
-                throw new PaymentProviderException("Stripe nije potvrdio povrat novca. Rezervacija nije otkazana.");
-            if (refund.Amount != PaymentRules.ToMinorUnits(chargedAmount) ||
-                !string.Equals(refund.Currency, "bam", StringComparison.OrdinalIgnoreCase))
-                throw new PaymentProviderException("Stripe refund iznos ili valuta ne odgovaraju lokalnom plaćanju. Rezervacija nije otkazana.");
+            providerIntent = await paymentGateway.GetIntentAsync(snapshot.ProviderReference, cancellationToken);
+            if (IsSucceeded(providerIntent))
+            {
+                refund = await RefundChargedIntentAsync(providerIntent, reservationId, cancellationToken);
+            }
+            else if (!IsCanceled(providerIntent))
+            {
+                providerIntent = await paymentGateway.CancelIntentAsync(snapshot.ProviderReference, cancellationToken);
+                if (IsSucceeded(providerIntent))
+                    refund = await RefundChargedIntentAsync(providerIntent, reservationId, cancellationToken);
+                else if (!IsCanceled(providerIntent))
+                    throw new PaymentProviderException("Stripe nije potvrdio otkazivanje aktivnog plaćanja. Rezervacija nije otkazana.");
+            }
+        }
+        else if (snapshot.PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new BusinessRuleException("Plaćanje nema Stripe referencu i ne može biti automatski refundirano.");
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -202,16 +207,19 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         reservation.StatusChangeReason = normalizedReason ?? (refund is null
             ? "Rezervacija je otkazana."
             : "Rezervacija je otkazana i izvršen je povrat sredstava.");
-        if (refund is not null && reservation.Payment is not null)
+        if (reservation.Payment is not null && providerIntent is not null)
         {
-            reservation.Payment.Status = PaymentStatus.Refunded;
-            reservation.Payment.RefundReference = refund.Id;
-            reservation.Payment.RefundedAmount = PaymentRules.FromMinorUnits(refund.Amount);
-            reservation.Payment.RefundedAtUtc = DateTime.UtcNow;
+            if (refund is not null)
+                ApplyRefund(reservation.Payment, refund);
+            else
+            {
+                reservation.Payment.Status = PaymentStatus.Failed;
+                reservation.Payment.FailureMessage = "Stripe PaymentIntent je otkazan prije naplate.";
+            }
             reservation.Payment.UpdatedAtUtc = DateTime.UtcNow;
         }
 
-        AddCancellationNotifications(reservation, refund is not null);
+        AddCancellationNotifications(reservation, refund is not null, refund?.Status);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -238,13 +246,38 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         if (payment is null)
             return await StoreWebhookResultAsync(webhook, "Ignored", "PaymentIntent nije povezan s lokalnim plaćanjem.", transaction, cancellationToken);
 
-        var outcome = webhook.Type switch
+        string outcome;
+        if (webhook.Type is "refund.updated" or "refund.failed")
         {
-            "payment_intent.succeeded" => HandleSucceeded(payment, webhook),
-            "payment_intent.payment_failed" => HandleFailed(payment, webhook),
-            "payment_intent.processing" => "Pending",
-            _ => "Ignored"
-        };
+            outcome = HandleRefundUpdate(payment, webhook);
+        }
+        else if (webhook.Type == "payment_intent.succeeded" &&
+                 payment.Reservation.Status == ReservationStatus.Cancelled)
+        {
+            if (!webhook.AmountReceived.HasValue || string.IsNullOrWhiteSpace(webhook.Currency))
+                outcome = "RejectedAmountMismatch";
+            else
+            {
+                var intent = new GatewayPaymentIntent(
+                    webhook.PaymentIntentId!, string.Empty, "succeeded",
+                    webhook.AmountReceived.Value, webhook.AmountReceived.Value, webhook.Currency);
+                var refund = await RefundChargedIntentAsync(intent, payment.ReservationId, cancellationToken);
+                ApplyRefund(payment, refund);
+                outcome = payment.Status == PaymentStatus.Refunded
+                    ? "RefundedAfterCancellation"
+                    : "RefundPendingAfterCancellation";
+            }
+        }
+        else
+        {
+            outcome = webhook.Type switch
+            {
+                "payment_intent.succeeded" => HandleSucceeded(payment, webhook),
+                "payment_intent.payment_failed" => HandleFailed(payment, webhook),
+                "payment_intent.processing" => "Pending",
+                _ => "Ignored"
+            };
+        }
 
         if (outcome is "Paid" or "Failed")
             AddPaymentNotifications(payment, outcome);
@@ -282,6 +315,71 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         return "Failed";
     }
 
+    private static string HandleRefundUpdate(Payment payment, GatewayWebhookEvent webhook)
+    {
+        if (!string.Equals(payment.RefundReference, webhook.RefundId, StringComparison.Ordinal))
+            return "Ignored";
+        if (string.Equals(webhook.RefundStatus, "succeeded", StringComparison.OrdinalIgnoreCase))
+        {
+            payment.Status = PaymentStatus.Refunded;
+            payment.RefundedAtUtc = DateTime.UtcNow;
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            return "Refunded";
+        }
+        if (webhook.Type == "refund.failed" ||
+            string.Equals(webhook.RefundStatus, "failed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(webhook.RefundStatus, "canceled", StringComparison.OrdinalIgnoreCase))
+        {
+            payment.Status = PaymentStatus.RefundFailed;
+            payment.FailureMessage = "Stripe refund nije uspio.";
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            return "RefundFailed";
+        }
+        payment.Status = PaymentStatus.RefundPending;
+        payment.UpdatedAtUtc = DateTime.UtcNow;
+        return "RefundPending";
+    }
+
+    private async Task<GatewayRefund> RefundChargedIntentAsync(
+        GatewayPaymentIntent intent,
+        int reservationId,
+        CancellationToken cancellationToken)
+    {
+        if (intent.AmountReceived <= 0 || !string.Equals(intent.Currency, "bam", StringComparison.OrdinalIgnoreCase))
+            throw new PaymentProviderException("Stripe nije vratio validan stvarno naplaćeni iznos za refund.");
+        var refund = await paymentGateway.RefundAsync(
+            intent.Id,
+            intent.AmountReceived,
+            $"reservation-{reservationId}-full-refund",
+            cancellationToken);
+        if (refund.Amount != intent.AmountReceived ||
+            !string.Equals(refund.Currency, intent.Currency, StringComparison.OrdinalIgnoreCase))
+            throw new PaymentProviderException("Stripe refund iznos ili valuta ne odgovaraju stvarnoj naplati.");
+        if (!string.Equals(refund.Status, "succeeded", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(refund.Status, "pending", StringComparison.OrdinalIgnoreCase))
+            throw new PaymentProviderException("Stripe nije prihvatio povrat novca. Rezervacija nije otkazana.");
+        return refund;
+    }
+
+    private static void ApplyRefund(Payment payment, GatewayRefund refund)
+    {
+        payment.Status = string.Equals(refund.Status, "succeeded", StringComparison.OrdinalIgnoreCase)
+            ? PaymentStatus.Refunded
+            : PaymentStatus.RefundPending;
+        payment.ChargedAmount = PaymentRules.FromMinorUnits(refund.Amount);
+        payment.RefundReference = refund.Id;
+        payment.RefundedAmount = PaymentRules.FromMinorUnits(refund.Amount);
+        payment.RefundedAtUtc = payment.Status == PaymentStatus.Refunded ? DateTime.UtcNow : null;
+        payment.FailureMessage = null;
+        payment.UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    private static bool IsSucceeded(GatewayPaymentIntent intent) =>
+        string.Equals(intent.Status, "succeeded", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCanceled(GatewayPaymentIntent intent) =>
+        string.Equals(intent.Status, "canceled", StringComparison.OrdinalIgnoreCase);
+
     private static string ApplyIntentStatus(Payment payment, GatewayPaymentIntent intent)
     {
         if (payment.Status == PaymentStatus.Refunded) return "Ignored";
@@ -311,10 +409,14 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         return "Pending";
     }
 
-    private void AddCancellationNotifications(Reservation reservation, bool refunded)
+    private void AddCancellationNotifications(Reservation reservation, bool refundStarted, string? refundStatus)
     {
         var occurredAtUtc = DateTime.UtcNow;
-        var refundText = refunded ? " Uplaćeni iznos je refundiran putem Stripea." : string.Empty;
+        var refundText = !refundStarted
+            ? string.Empty
+            : string.Equals(refundStatus, "succeeded", StringComparison.OrdinalIgnoreCase)
+                ? " Uplaćeni iznos je refundiran putem Stripea."
+                : " Povrat uplaćenog iznosa je pokrenut i čeka potvrdu Stripea.";
         dbContext.EnqueueNotification(new NotificationEvent(
             Guid.NewGuid(), reservation.GuestId, "ReservationCancelled", "Rezervacija otkazana",
             $"Rezervacija {reservation.ConfirmationCode} je otkazana.{refundText}",

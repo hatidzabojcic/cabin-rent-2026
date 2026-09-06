@@ -2,6 +2,8 @@ using CabinRent.Infrastructure.Payments;
 using CabinRent.Infrastructure.Persistence;
 using CabinRent.Services.Payments;
 using CabinRent.Services.Exceptions;
+using CabinRent.Infrastructure.Platform;
+using CabinRent.Model.Reservations;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -83,6 +85,7 @@ public sealed class PaymentWebhookTests
     {
         await using var fixture = await PaymentFixture.CreateAsync(PaymentStatus.Paid);
         var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "succeeded", 120000, 120000, "bam"),
             refund: new GatewayRefund("re_test", "succeeded", 120000, "bam"));
         var service = new PaymentService(fixture.Context, gateway);
         var reservation = await fixture.Context.Reservations.SingleAsync();
@@ -100,6 +103,110 @@ public sealed class PaymentWebhookTests
         Assert.Equal("re_test", payment.RefundReference);
         Assert.Equal(1, gateway.RefundCalls);
         Assert.Equal(2, await fixture.Context.NotificationOutbox.CountAsync());
+    }
+
+    [Fact]
+    public async Task Canceling_unpaid_reservation_cancels_active_intent_before_local_cancellation()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "requires_payment_method", 120000, 0, "bam"),
+            cancelledIntent: new GatewayPaymentIntent("pi_test", "secret", "canceled", 120000, 0, "bam"));
+        var service = new PaymentService(fixture.Context, gateway);
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+
+        Assert.True(await service.CancelReservationAsync(
+            reservation.Id, reservation.GuestId, false, false, "Promijenjeni planovi."));
+
+        Assert.Equal(1, gateway.CancelCalls);
+        Assert.Equal(ReservationStatus.Cancelled, (await fixture.Context.Reservations.SingleAsync()).Status);
+        Assert.Equal(PaymentStatus.Failed, (await fixture.Context.Payments.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Pending_refund_is_not_reported_as_completed_refund()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync(PaymentStatus.Paid);
+        var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "succeeded", 120000, 120000, "bam"),
+            refund: new GatewayRefund("re_pending", "pending", 120000, "bam"));
+        var service = new PaymentService(fixture.Context, gateway);
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+
+        await service.CancelReservationAsync(
+            reservation.Id, reservation.GuestId, false, false, "Promijenjeni planovi.");
+
+        var payment = await fixture.Context.Payments.SingleAsync();
+        Assert.Equal(PaymentStatus.RefundPending, payment.Status);
+        Assert.Null(payment.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task Refund_webhook_finalizes_pending_refund()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync(PaymentStatus.Paid);
+        var payment = await fixture.Context.Payments.SingleAsync();
+        payment.Status = PaymentStatus.RefundPending;
+        payment.RefundReference = "re_pending";
+        payment.RefundedAmount = 1200m;
+        await fixture.Context.SaveChangesAsync();
+        var gateway = new FakePaymentGateway(webhook: new GatewayWebhookEvent(
+            "evt_refund", "refund.updated", "pi_test", 120000, "bam", null,
+            "re_pending", "succeeded"));
+
+        var result = await new PaymentService(fixture.Context, gateway)
+            .ProcessWebhookAsync("payload", "signature");
+
+        Assert.Equal("Refunded", result.Outcome);
+        Assert.Equal(PaymentStatus.Refunded, (await fixture.Context.Payments.SingleAsync()).Status);
+        Assert.NotNull((await fixture.Context.Payments.SingleAsync()).RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task Late_success_for_cancelled_reservation_is_automatically_refunded()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+        reservation.Status = ReservationStatus.Cancelled;
+        await fixture.Context.SaveChangesAsync();
+        var gateway = new FakePaymentGateway(
+            webhook: new GatewayWebhookEvent(
+                "evt_late", "payment_intent.succeeded", "pi_test", 120000, "bam", null),
+            refund: new GatewayRefund("re_late", "succeeded", 120000, "bam"));
+
+        var result = await new PaymentService(fixture.Context, gateway)
+            .ProcessWebhookAsync("payload", "signature");
+
+        Assert.Equal("RefundedAfterCancellation", result.Outcome);
+        Assert.Equal(PaymentStatus.Refunded, (await fixture.Context.Payments.SingleAsync()).Status);
+        Assert.Equal(1, gateway.RefundCalls);
+    }
+
+    [Fact]
+    public async Task Reschedule_cancels_existing_intent_before_replacing_payment_data()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "requires_payment_method", 120000, 0, "bam"),
+            cancelledIntent: new GatewayPaymentIntent("pi_test", "secret", "canceled", 120000, 0, "bam"));
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+        var service = new ReservationService(fixture.Context, gateway);
+
+        var result = await service.RescheduleAsync(
+            reservation.Id,
+            new RescheduleReservationRequest
+            {
+                CheckIn = new DateOnly(2027, 2, 10),
+                CheckOut = new DateOnly(2027, 2, 12)
+            },
+            reservation.GuestId);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, gateway.CancelCalls);
+        var payment = await fixture.Context.Payments.SingleAsync();
+        Assert.Null(payment.ProviderReference);
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(600m, payment.Amount);
     }
 
     [Fact]
@@ -123,14 +230,21 @@ public sealed class PaymentWebhookTests
     private sealed class FakePaymentGateway(
         GatewayWebhookEvent? webhook = null,
         GatewayPaymentIntent? intent = null,
-        GatewayRefund? refund = null) : IPaymentGateway
+        GatewayRefund? refund = null,
+        GatewayPaymentIntent? cancelledIntent = null) : IPaymentGateway
     {
         public int RefundCalls { get; private set; }
+        public int CancelCalls { get; private set; }
         public string PublishableKey => "pk_test_fake";
         public Task<GatewayPaymentIntent> CreateIntentAsync(long amountInMinorUnits, string currency, int reservationId, int paymentId, string idempotencyKey, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
         public Task<GatewayPaymentIntent> GetIntentAsync(string providerReference, CancellationToken cancellationToken = default) =>
             Task.FromResult(intent ?? throw new NotSupportedException());
+        public Task<GatewayPaymentIntent> CancelIntentAsync(string providerReference, CancellationToken cancellationToken = default)
+        {
+            CancelCalls++;
+            return Task.FromResult(cancelledIntent ?? throw new NotSupportedException());
+        }
         public Task<GatewayRefund> RefundAsync(string paymentIntentId, long amountInMinorUnits, string idempotencyKey, CancellationToken cancellationToken = default)
         {
             RefundCalls++;

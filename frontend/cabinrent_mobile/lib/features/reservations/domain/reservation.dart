@@ -77,6 +77,8 @@ class Reservation {
     return status == 'Confirmed' &&
         paymentStatus != 'Paid' &&
         paymentStatus != 'Refunded' &&
+        paymentStatus != 'RefundPending' &&
+        paymentStatus != 'RefundFailed' &&
         checkInDate.isAfter(today);
   }
 
@@ -110,5 +112,7 @@ String paymentStatusLabel(String? status) =>
       'Paid': 'Plaćeno',
       'Failed': 'Neuspjelo',
       'Refunded': 'Refundirano',
+      'RefundPending': 'Refund u obradi',
+      'RefundFailed': 'Refund nije uspio',
     }[status] ??
     'Nije evidentirano';

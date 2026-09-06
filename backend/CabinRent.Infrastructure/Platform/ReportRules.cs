@@ -19,10 +19,13 @@ public static class ReportRules
         decimal? chargedAmount,
         decimal refundedAmount)
     {
-        if (paymentStatus is not (PaymentStatus.Paid or PaymentStatus.Refunded)) return 0;
+        if (paymentStatus is not (PaymentStatus.Paid or PaymentStatus.Refunded
+            or PaymentStatus.RefundPending or PaymentStatus.RefundFailed)) return 0;
 
         var collectedAmount = chargedAmount ?? paymentAmount;
-        return Math.Max(0, collectedAmount - refundedAmount);
+        return paymentStatus is PaymentStatus.RefundPending or PaymentStatus.RefundFailed
+            ? collectedAmount
+            : Math.Max(0, collectedAmount - refundedAmount);
     }
 
     public static IReadOnlyCollection<TopGuestDto> RankGuests(IEnumerable<TopGuestDto> guests, int limit) =>

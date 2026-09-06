@@ -21,6 +21,7 @@ public interface IPaymentGateway
         string idempotencyKey,
         CancellationToken cancellationToken = default);
     Task<GatewayPaymentIntent> GetIntentAsync(string providerReference, CancellationToken cancellationToken = default);
+    Task<GatewayPaymentIntent> CancelIntentAsync(string providerReference, CancellationToken cancellationToken = default);
     Task<GatewayRefund> RefundAsync(
         string paymentIntentId,
         long amountInMinorUnits,
@@ -43,7 +44,9 @@ public sealed record GatewayWebhookEvent(
     string? PaymentIntentId,
     long? AmountReceived,
     string? Currency,
-    string? FailureMessage);
+    string? FailureMessage,
+    string? RefundId = null,
+    string? RefundStatus = null);
 
 public sealed class PaymentProviderException(string message, Exception? innerException = null) : Exception(message, innerException);
 

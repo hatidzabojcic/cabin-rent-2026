@@ -7,7 +7,10 @@ public static class PaymentRules
     public static bool CanStartPayment(ReservationStatus reservationStatus, PaymentStatus? paymentStatus, DateOnly checkIn, DateOnly today) =>
         reservationStatus == ReservationStatus.Confirmed &&
         checkIn > today &&
-        paymentStatus is not PaymentStatus.Paid and not PaymentStatus.Refunded;
+        paymentStatus is not PaymentStatus.Paid
+            and not PaymentStatus.Refunded
+            and not PaymentStatus.RefundPending
+            and not PaymentStatus.RefundFailed;
 
     public static long ToMinorUnits(decimal amount) =>
         checked((long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero));

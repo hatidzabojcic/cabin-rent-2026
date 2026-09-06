@@ -115,7 +115,7 @@ public sealed class CabinAmenity
 }
 
 public enum ReservationStatus { Pending, Confirmed, Cancelled, Completed, Rejected }
-public enum PaymentStatus { Pending, Paid, Failed, Refunded }
+public enum PaymentStatus { Pending, Paid, Failed, Refunded, RefundPending, RefundFailed }
 
 public sealed class Reservation : Entity
 {

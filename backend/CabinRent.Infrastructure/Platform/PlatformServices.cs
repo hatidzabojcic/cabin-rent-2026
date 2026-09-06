@@ -11,6 +11,8 @@ using CabinRent.Model.Notifications;
 using Microsoft.EntityFrameworkCore;
 using CabinRent.Model.Common;
 using Microsoft.Extensions.Caching.Memory;
+using CabinRent.Services.Payments;
+using CabinRent.Infrastructure.Payments;
 
 namespace CabinRent.Infrastructure.Platform;
 
@@ -232,7 +234,7 @@ public sealed class PlatformQueryService(
             x.OwnedCabins.SelectMany(cabin => cabin.Reservations).Count());
 }
 
-public sealed class ReservationService(CabinRentDbContext dbContext) : IReservationService
+public sealed class ReservationService(CabinRentDbContext dbContext, IPaymentGateway? paymentGateway = null) : IReservationService
 {
     public Task<PagedResult<ReservationDto>> GetAsync(PageRequest paging, int? guestId, int? ownerId, int? cabinId, string? status, CancellationToken cancellationToken = default)
     {
@@ -417,6 +419,33 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
         if (overlaps || blocked)
             throw new BusinessRuleException("Vikendica nije dostupna u odabranom terminu.");
 
+        if (!string.IsNullOrWhiteSpace(reservation.Payment?.ProviderReference))
+        {
+            if (paymentGateway is null)
+                throw new PaymentConfigurationException("Stripe gateway nije dostupan za promjenu termina.");
+            var intent = await paymentGateway.GetIntentAsync(
+                reservation.Payment.ProviderReference, cancellationToken);
+            if (!string.Equals(intent.Status, "canceled", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(intent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                intent = await paymentGateway.CancelIntentAsync(
+                    reservation.Payment.ProviderReference, cancellationToken);
+            }
+            if (string.Equals(intent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                reservation.Payment.Status = PaymentStatus.Paid;
+                reservation.Payment.ChargedAmount = PaymentRules.FromMinorUnits(intent.AmountReceived);
+                reservation.Payment.PaidAtUtc = DateTime.UtcNow;
+                reservation.Payment.UpdatedAtUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                throw new BusinessRuleException(
+                    "Stripe je već potvrdio naplatu. Termin nije promijenjen; prvo otkažite rezervaciju kroz refund tok.");
+            }
+            if (!string.Equals(intent.Status, "canceled", StringComparison.OrdinalIgnoreCase))
+                throw new PaymentProviderException(
+                    "Stripe nije potvrdio otkazivanje postojećeg plaćanja. Termin nije promijenjen.");
+        }
+
         var nights = request.CheckOut.DayNumber - request.CheckIn.DayNumber;
         var totalPrice = reservation.Cabin.PricePerNight * nights;
         reservation.CheckIn = request.CheckIn;
@@ -457,7 +486,8 @@ public sealed class ReservationService(CabinRentDbContext dbContext) : IReservat
             x.Guest.FirstName + " " + x.Guest.LastName, x.Guest.Email, x.Guest.PhoneNumber,
             x.CheckIn, x.CheckOut, x.Adults, x.Children, x.PricePerNight, x.TotalPrice,
               x.Status.ToString(), x.SpecialRequests, x.Payment == null ? null : x.Payment.Status.ToString(),
-              x.Payment != null && (x.Payment.Status == PaymentStatus.Paid || x.Payment.Status == PaymentStatus.Refunded)
+              x.Payment != null && (x.Payment.Status == PaymentStatus.Paid || x.Payment.Status == PaymentStatus.Refunded ||
+                  x.Payment.Status == PaymentStatus.RefundPending || x.Payment.Status == PaymentStatus.RefundFailed)
                   ? x.Payment.ChargedAmount ?? x.Payment.Amount : 0,
               x.Payment == null ? null : x.Payment.Currency,
               x.Payment == null ? null : x.Payment.PaidAtUtc,

@@ -64,6 +64,27 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
+    public async Task<GatewayPaymentIntent> CancelIntentAsync(string providerReference, CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var service = new PaymentIntentService(_client);
+        try
+        {
+            return Map(await service.CancelAsync(providerReference, cancellationToken: cancellationToken));
+        }
+        catch (StripeException)
+        {
+            try
+            {
+                return Map(await service.GetAsync(providerReference, cancellationToken: cancellationToken));
+            }
+            catch (StripeException exception)
+            {
+                throw new PaymentProviderException("Stripe trenutno nije mogao otkazati plaćanje. Pokušajte ponovo.", exception);
+            }
+        }
+    }
+
     public async Task<GatewayRefund> RefundAsync(
         string paymentIntentId,
         long amountInMinorUnits,
@@ -101,13 +122,16 @@ public sealed class StripePaymentGateway : IPaymentGateway
         {
             var stripeEvent = EventUtility.ConstructEvent(payload, signature, _options.WebhookSecret);
             var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+            var refund = stripeEvent.Data.Object as Refund;
             return new GatewayWebhookEvent(
                 stripeEvent.Id,
                 stripeEvent.Type,
-                paymentIntent?.Id,
-                paymentIntent?.AmountReceived,
-                paymentIntent?.Currency,
-                paymentIntent?.LastPaymentError?.Message);
+                paymentIntent?.Id ?? refund?.PaymentIntentId,
+                paymentIntent?.AmountReceived ?? refund?.Amount,
+                paymentIntent?.Currency ?? refund?.Currency,
+                paymentIntent?.LastPaymentError?.Message,
+                refund?.Id,
+                refund?.Status);
         }
         catch (StripeException exception)
         {
