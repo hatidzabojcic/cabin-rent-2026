@@ -97,13 +97,15 @@ flutter run -d windows --dart-define=API_BASE_URL=http://localhost:8080
 
 ## Stripe testno plaćanje
 
-Standardno plaćanje i refund koriste server-side Stripe provjeru i ne zahtijevaju ručno pokretanje webhook listenera.
+Plaćanje i refund koriste server-side Stripe provjeru. API nakon `docker compose up --build` automatski usklađuje
+nezavršena plaćanja i refunde sa Stripeom, pa ručno pokretanje webhook listenera nije potrebno ni kada se
+aplikacija zatvori prije konačne potvrde.
 
 - kartica: `4242 4242 4242 4242`
 - datum isteka: bilo koji budući datum, npr. `12/34`
 - CVC: bilo koja tri broja
 
-Opcionalno asinhrono webhook testiranje:
+Webhook listener ostaje samo opcionalni razvojni alat za neposredno praćenje Stripe događaja:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass

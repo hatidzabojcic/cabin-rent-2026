@@ -113,6 +113,24 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
+    public async Task<GatewayRefund> GetRefundAsync(
+        string refundReference,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        try
+        {
+            var refund = await new RefundService(_client)
+                .GetAsync(refundReference, cancellationToken: cancellationToken);
+            return new GatewayRefund(refund.Id, refund.Status, refund.Amount, refund.Currency);
+        }
+        catch (StripeException exception)
+        {
+            throw new PaymentProviderException(
+                "Stripe trenutno nije mogao provjeriti status povrata novca.", exception);
+        }
+    }
+
     public GatewayWebhookEvent ParseWebhook(string payload, string signature)
     {
         if (string.IsNullOrWhiteSpace(_options.WebhookSecret))

@@ -7,10 +7,14 @@ using CabinRent.Model.Notifications;
 using System.Data;
 using CabinRent.Infrastructure.Platform;
 using CabinRent.Services.Exceptions;
+using Microsoft.Extensions.Logging;
 
 namespace CabinRent.Infrastructure.Payments;
 
-public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway paymentGateway) : IPaymentService
+public sealed class PaymentService(
+    CabinRentDbContext dbContext,
+    IPaymentGateway paymentGateway,
+    ILogger<PaymentService>? logger = null) : IPaymentService
 {
     private static readonly HashSet<string> SupportedWebhookTypes = new(StringComparer.Ordinal)
     {
@@ -58,7 +62,10 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
             payment.Amount = reservation.TotalPrice;
             payment.Currency = "BAM";
             payment.Provider = "Stripe";
+            payment.Status = PaymentStatus.Pending;
             payment.FailureMessage = null;
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         GatewayPaymentIntent intent;
@@ -288,6 +295,110 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
         return new PaymentWebhookResultDto(webhook.EventId, outcome);
     }
 
+    public async Task<int> ReconcilePendingAsync(CancellationToken cancellationToken = default)
+    {
+        var candidateIds = await dbContext.Payments.AsNoTracking()
+            .Where(x => x.ProviderReference != null &&
+                (x.Status == PaymentStatus.RefundPending ||
+                 (x.Reservation.Status == ReservationStatus.Cancelled &&
+                    (x.Status == PaymentStatus.Pending || x.Status == PaymentStatus.Paid)) ||
+                 (x.Reservation.Status != ReservationStatus.Cancelled &&
+                    x.Status == PaymentStatus.Pending)))
+            .OrderBy(x => x.UpdatedAtUtc)
+            .Select(x => x.Id)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        var changed = 0;
+        foreach (var paymentId in candidateIds)
+        {
+            try
+            {
+                if (await ReconcilePaymentAsync(paymentId, cancellationToken))
+                    changed++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is PaymentProviderException or BusinessRuleException)
+            {
+                logger?.LogWarning(exception,
+                    "Automatsko Stripe usklađivanje plaćanja {PaymentId} trenutno nije uspjelo; pokušaj će biti ponovljen.",
+                    paymentId);
+            }
+
+            dbContext.ChangeTracker.Clear();
+        }
+
+        return changed;
+    }
+
+    private async Task<bool> ReconcilePaymentAsync(int paymentId, CancellationToken cancellationToken)
+    {
+        var snapshot = await dbContext.Payments.AsNoTracking()
+            .Where(x => x.Id == paymentId)
+            .Select(x => new
+            {
+                x.ProviderReference,
+                x.RefundReference,
+                x.Status,
+                x.ReservationId,
+                ReservationStatus = x.Reservation.Status
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (snapshot?.ProviderReference is null)
+            return false;
+
+        GatewayRefund? refund = null;
+        GatewayPaymentIntent? intent = null;
+        if (!string.IsNullOrWhiteSpace(snapshot.RefundReference) &&
+            snapshot.Status is PaymentStatus.RefundPending or PaymentStatus.RefundFailed)
+        {
+            refund = await paymentGateway.GetRefundAsync(snapshot.RefundReference, cancellationToken);
+        }
+        else
+        {
+            intent = await paymentGateway.GetIntentAsync(snapshot.ProviderReference, cancellationToken);
+            if (snapshot.ReservationStatus == ReservationStatus.Cancelled && IsSucceeded(intent))
+                refund = await RefundChargedIntentAsync(intent, snapshot.ReservationId, cancellationToken);
+        }
+
+        var payment = await dbContext.Payments
+            .Include(x => x.Reservation).ThenInclude(x => x.Cabin)
+            .SingleOrDefaultAsync(x => x.Id == paymentId, cancellationToken);
+        if (payment is null || !string.Equals(payment.ProviderReference, snapshot.ProviderReference, StringComparison.Ordinal))
+            return false;
+
+        var previousStatus = payment.Status;
+        if (refund is not null)
+        {
+            if (payment.Status != PaymentStatus.Refunded)
+                ApplyRefund(payment, refund);
+        }
+        else if (intent is not null && payment.Reservation.Status == ReservationStatus.Cancelled)
+        {
+            if (IsCanceled(intent) && payment.Status is PaymentStatus.Pending or PaymentStatus.Failed)
+            {
+                payment.Status = PaymentStatus.Failed;
+                payment.FailureMessage = "Stripe PaymentIntent je otkazan prije naplate.";
+                payment.UpdatedAtUtc = DateTime.UtcNow;
+            }
+        }
+        else if (intent is not null)
+        {
+            var outcome = ApplyIntentStatus(payment, intent);
+            if (payment.Status != previousStatus && outcome is "Paid" or "Failed")
+                AddPaymentNotifications(payment, outcome);
+        }
+
+        if (payment.Status == previousStatus)
+            return false;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static string HandleSucceeded(Payment payment, GatewayWebhookEvent webhook)
     {
         if (payment.Status == PaymentStatus.Refunded) return "Ignored";
@@ -365,12 +476,17 @@ public sealed class PaymentService(CabinRentDbContext dbContext, IPaymentGateway
     {
         payment.Status = string.Equals(refund.Status, "succeeded", StringComparison.OrdinalIgnoreCase)
             ? PaymentStatus.Refunded
-            : PaymentStatus.RefundPending;
+            : string.Equals(refund.Status, "failed", StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(refund.Status, "canceled", StringComparison.OrdinalIgnoreCase)
+                ? PaymentStatus.RefundFailed
+                : PaymentStatus.RefundPending;
         payment.ChargedAmount = PaymentRules.FromMinorUnits(refund.Amount);
         payment.RefundReference = refund.Id;
         payment.RefundedAmount = PaymentRules.FromMinorUnits(refund.Amount);
         payment.RefundedAtUtc = payment.Status == PaymentStatus.Refunded ? DateTime.UtcNow : null;
-        payment.FailureMessage = null;
+        payment.FailureMessage = payment.Status == PaymentStatus.RefundFailed
+            ? "Stripe refund nije uspio."
+            : null;
         payment.UpdatedAtUtc = DateTime.UtcNow;
     }
 

@@ -8,6 +8,7 @@ public interface IPaymentService
     Task<PaymentConfirmationDto> ConfirmIntentAsync(int reservationId, int guestId, CancellationToken cancellationToken = default);
     Task<bool> CancelReservationAsync(int reservationId, int actorId, bool isAdmin, bool isOwner, string? reason = null, CancellationToken cancellationToken = default);
     Task<PaymentWebhookResultDto> ProcessWebhookAsync(string payload, string signature, CancellationToken cancellationToken = default);
+    Task<int> ReconcilePendingAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IPaymentGateway
@@ -22,6 +23,7 @@ public interface IPaymentGateway
         CancellationToken cancellationToken = default);
     Task<GatewayPaymentIntent> GetIntentAsync(string providerReference, CancellationToken cancellationToken = default);
     Task<GatewayPaymentIntent> CancelIntentAsync(string providerReference, CancellationToken cancellationToken = default);
+    Task<GatewayRefund> GetRefundAsync(string refundReference, CancellationToken cancellationToken = default);
     Task<GatewayRefund> RefundAsync(
         string paymentIntentId,
         long amountInMinorUnits,

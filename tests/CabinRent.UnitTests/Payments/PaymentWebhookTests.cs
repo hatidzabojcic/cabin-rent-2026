@@ -163,6 +163,77 @@ public sealed class PaymentWebhookTests
     }
 
     [Fact]
+    public async Task Reconciliation_finalizes_pending_refund_without_webhook_listener()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync(PaymentStatus.RefundPending);
+        var payment = await fixture.Context.Payments.SingleAsync();
+        payment.RefundReference = "re_pending";
+        payment.RefundedAmount = 1200m;
+        await fixture.Context.SaveChangesAsync();
+        var gateway = new FakePaymentGateway(
+            retrievedRefund: new GatewayRefund("re_pending", "succeeded", 120000, "bam"));
+
+        var changed = await new PaymentService(fixture.Context, gateway).ReconcilePendingAsync();
+
+        Assert.Equal(1, changed);
+        Assert.Equal(PaymentStatus.Refunded, (await fixture.Context.Payments.SingleAsync()).Status);
+        Assert.NotNull((await fixture.Context.Payments.SingleAsync()).RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task Reconciliation_records_failed_refund_without_webhook_listener()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync(PaymentStatus.RefundPending);
+        var payment = await fixture.Context.Payments.SingleAsync();
+        payment.RefundReference = "re_failed";
+        payment.RefundedAmount = 1200m;
+        await fixture.Context.SaveChangesAsync();
+        var gateway = new FakePaymentGateway(
+            retrievedRefund: new GatewayRefund("re_failed", "failed", 120000, "bam"));
+
+        var changed = await new PaymentService(fixture.Context, gateway).ReconcilePendingAsync();
+
+        Assert.Equal(1, changed);
+        payment = await fixture.Context.Payments.SingleAsync();
+        Assert.Equal(PaymentStatus.RefundFailed, payment.Status);
+        Assert.Null(payment.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task Reconciliation_records_successful_payment_when_client_did_not_confirm()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "succeeded", 120000, 120000, "bam"));
+
+        var changed = await new PaymentService(fixture.Context, gateway).ReconcilePendingAsync();
+
+        Assert.Equal(1, changed);
+        var payment = await fixture.Context.Payments.SingleAsync();
+        Assert.Equal(PaymentStatus.Paid, payment.Status);
+        Assert.Equal(1200m, payment.ChargedAmount);
+    }
+
+    [Fact]
+    public async Task Reconciliation_refunds_late_success_for_cancelled_reservation_without_webhook()
+    {
+        await using var fixture = await PaymentFixture.CreateAsync();
+        var reservation = await fixture.Context.Reservations.SingleAsync();
+        reservation.Status = ReservationStatus.Cancelled;
+        await fixture.Context.SaveChangesAsync();
+        var gateway = new FakePaymentGateway(
+            intent: new GatewayPaymentIntent("pi_test", "secret", "succeeded", 120000, 120000, "bam"),
+            refund: new GatewayRefund("re_late", "succeeded", 120000, "bam"));
+        var service = new PaymentService(fixture.Context, gateway);
+
+        Assert.Equal(1, await service.ReconcilePendingAsync());
+        Assert.Equal(0, await service.ReconcilePendingAsync());
+
+        Assert.Equal(PaymentStatus.Refunded, (await fixture.Context.Payments.SingleAsync()).Status);
+        Assert.Equal(1, gateway.RefundCalls);
+    }
+
+    [Fact]
     public async Task Late_success_for_cancelled_reservation_is_automatically_refunded()
     {
         await using var fixture = await PaymentFixture.CreateAsync();
@@ -231,7 +302,8 @@ public sealed class PaymentWebhookTests
         GatewayWebhookEvent? webhook = null,
         GatewayPaymentIntent? intent = null,
         GatewayRefund? refund = null,
-        GatewayPaymentIntent? cancelledIntent = null) : IPaymentGateway
+        GatewayPaymentIntent? cancelledIntent = null,
+        GatewayRefund? retrievedRefund = null) : IPaymentGateway
     {
         public int RefundCalls { get; private set; }
         public int CancelCalls { get; private set; }
@@ -245,6 +317,8 @@ public sealed class PaymentWebhookTests
             CancelCalls++;
             return Task.FromResult(cancelledIntent ?? throw new NotSupportedException());
         }
+        public Task<GatewayRefund> GetRefundAsync(string refundReference, CancellationToken cancellationToken = default) =>
+            Task.FromResult(retrievedRefund ?? throw new NotSupportedException());
         public Task<GatewayRefund> RefundAsync(string paymentIntentId, long amountInMinorUnits, string idempotencyKey, CancellationToken cancellationToken = default)
         {
             RefundCalls++;
