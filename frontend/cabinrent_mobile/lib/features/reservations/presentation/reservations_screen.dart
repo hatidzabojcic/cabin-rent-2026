@@ -31,9 +31,9 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final c = context.read<ReservationsController>();
-      if (!c.hasLoaded) c.load();
+      c.load();
       final reviews = context.read<ReviewsController>();
-      if (!reviews.hasLoadedMine) reviews.loadMine();
+      reviews.loadMine();
     });
   }
 
