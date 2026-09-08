@@ -153,7 +153,9 @@ class _WelcomePageState extends State<_WelcomePage> {
 
   Future<void> _refresh() async {
     final announcements = context.read<AnnouncementsRepository>().getPublished();
-    setState(() => _announcements = announcements);
+    setState(() {
+      _announcements = announcements;
+    });
     await Future.wait([
       announcements,
       context.read<RecommendationsController>().load(),
